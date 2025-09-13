@@ -1,0 +1,156 @@
+[
+  {
+    "id": "deal-1",
+    "userId": "user-2",
+    "userEmail": "marcus.reinhart@alpinecapital.com",
+    "title": "Mallorca Boutique Acquisition",
+    "lastEditedAt": "2024-12-15T14:30:00Z",
+    "totalProjectCost": 8500000,
+    "projectIRR": 0.173,
+    "kpis": {
+      "rooms": 28,
+      "adr": 285,
+      "occ": 0.72,
+      "revpar": 205
+    },
+    "payroll": {
+      "totalAnnual": 420000,
+      "frontOffice": 85000,
+      "housekeeping": 95000,
+      "fnb": 140000,
+      "management": 100000
+    },
+    "opex": {
+      "utilities": 45000,
+      "maintenance": 35000,
+      "marketing": 28000,
+      "insurance": 22000
+    },
+    "capex": {
+      "year0": 8500000,
+      "items": [
+        {"name": "Property Acquisition", "amount": 6200000},
+        {"name": "Renovation & FF&E", "amount": 1800000},
+        {"name": "Professional Fees", "amount": 350000},
+        {"name": "Contingency", "amount": 150000}
+      ]
+    },
+    "financing": {
+      "ltv": 0.65,
+      "rate": 0.055,
+      "termYears": 20
+    },
+    "exit": {
+      "year": 7,
+      "exitCapRate": 0.065,
+      "salePrice": 12300000
+    }
+  },
+  {
+    "id": "deal-2",
+    "userId": "user-3",
+    "userEmail": "isabella.rossi@medassset.com",
+    "title": "Ibiza Beach Resort Development",
+    "lastEditedAt": "2024-12-14T11:20:00Z",
+    "totalProjectCost": 12500000,
+    "projectIRR": 0.156,
+    "kpis": {
+      "rooms": 35,
+      "adr": 420,
+      "occ": 0.78,
+      "revpar": 328
+    },
+    "payroll": {
+      "totalAnnual": 580000,
+      "frontOffice": 110000,
+      "housekeeping": 125000,
+      "fnb": 195000,
+      "management": 150000
+    },
+    "opex": {
+      "utilities": 62000,
+      "maintenance": 48000,
+      "marketing": 38000,
+      "insurance": 31000
+    },
+    "capex": {
+      "year0": 12500000,
+      "items": [
+        {"name": "Land Acquisition", "amount": 4500000},
+        {"name": "Construction", "amount": 6200000},
+        {"name": "FF&E & OS&E", "amount": 1200000},
+        {"name": "Pre-opening", "amount": 600000}
+      ]
+    },
+    "financing": {
+      "ltv": 0.70,
+      "rate": 0.048,
+      "termYears": 25
+    },
+    "exit": {
+      "year": 5,
+      "exitCapRate": 0.058,
+      "salePrice": 16800000
+    }
+  },
+  {
+    "id": "deal-3",
+    "userId": "user-4",
+    "userEmail": "james.wellington@coastalhospitality.com",
+    "title": "Portuguese Coastal Hotel",
+    "lastEditedAt": "2024-12-13T16:45:00Z",
+    "totalProjectCost": 5200000,
+    "projectIRR": 0.142,
+    "kpis": {
+      "rooms": 22,
+      "adr": 195,
+      "occ": 0.68,
+      "revpar": 133
+    }
+  },
+  {
+    "id": "deal-4",
+    "userId": "user-5",
+    "userEmail": "sofia.martinez@iberianhotels.es",
+    "title": "Andalusian Cortijo Conversion",
+    "lastEditedAt": "2024-12-12T09:15:00Z",
+    "totalProjectCost": 3800000,
+    "projectIRR": 0.189
+  },
+  {
+    "id": "deal-5",
+    "userId": "user-6",
+    "userEmail": "antonio.silva@portugalinvest.pt",
+    "title": "Algarve Boutique Resort",
+    "lastEditedAt": "2024-12-11T13:30:00Z",
+    "totalProjectCost": 9200000,
+    "projectIRR": 0.134
+  },
+  {
+    "id": "deal-6",
+    "userId": "user-7",
+    "userEmail": "elena.greco@italianproperties.it",
+    "title": "Sicilian Villa Hotel",
+    "lastEditedAt": "2024-12-10T10:45:00Z",
+    "totalProjectCost": 6700000,
+    "projectIRR": 0.161
+  },
+  {
+    "id": "deal-7",
+    "userId": "user-2",
+    "userEmail": "marcus.reinhart@alpinecapital.com",
+    "title": "Costa Brava Seaside Property",
+    "lastEditedAt": "2024-12-09T15:20:00Z",
+    "totalProjectCost": 7800000,
+    "projectIRR": 0.148
+  },
+  {
+    "id": "deal-8",
+    "userId": "user-3",
+    "userEmail": "isabella.rossi@medassset.com",
+    "title": "Menorca Heritage Hotel",
+    "lastEditedAt": "2024-12-08T12:10:00Z",
+    "totalProjectCost": 4100000,
+    "projectIRR": 0.167
+  }
+]
