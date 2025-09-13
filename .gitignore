@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+
+# builds
+dist/
+build/
+.vercel/
+.netlify/
+.vite/
+
+# env / local
+.env
+.env.*.local
+*.local
+
+# misc
+.DS_Store
+*.log
+*.log.*
+
+# --- Do NOT ignore src/ or configs ---
+# Track source code, configs, and docs:
+#   src/
+#   package.json, tsconfig.json, vite.config.ts
+#   README.md
