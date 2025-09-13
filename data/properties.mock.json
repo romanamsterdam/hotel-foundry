@@ -1,0 +1,68 @@
+[
+  {
+    "name": "Siargao Pilot",
+    "country": "Philippines",
+    "city": "General Luna",
+    "rooms": 18,
+    "gfa_sqm": 1600,
+    "cover_image_url": "https://images.pexels.com/photos/189296/pexels-photo-189296.jpeg",
+    "lat": 9.784,
+    "lng": 126.165,
+    "status": "active"
+  },
+  {
+    "name": "Bali Surf Lodge",
+    "country": "Indonesia",
+    "city": "Canggu",
+    "rooms": 22,
+    "gfa_sqm": 2100,
+    "cover_image_url": "https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg",
+    "lat": -8.647,
+    "lng": 115.138,
+    "status": "active"
+  },
+  {
+    "name": "Villa Es Vedra",
+    "country": "Spain",
+    "city": "Ibiza",
+    "rooms": 24,
+    "gfa_sqm": 1450,
+    "cover_image_url": "https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg",
+    "lat": 38.914,
+    "lng": 1.404,
+    "status": "active"
+  },
+  {
+    "name": "Quinta do Mar",
+    "country": "Portugal",
+    "city": "Lagos",
+    "rooms": 28,
+    "gfa_sqm": 1650,
+    "cover_image_url": "https://images.pexels.com/photos/1134176/pexels-photo-1134176.jpeg",
+    "lat": 37.102,
+    "lng": -8.674,
+    "status": "active"
+  },
+  {
+    "name": "Palazzo Siciliano",
+    "country": "Italy",
+    "city": "Taormina",
+    "rooms": 22,
+    "gfa_sqm": 1350,
+    "cover_image_url": "https://images.pexels.com/photos/1134176/pexels-photo-1134176.jpeg",
+    "lat": 37.853,
+    "lng": 15.293,
+    "status": "active"
+  },
+  {
+    "name": "Trullo Paradise",
+    "country": "Italy",
+    "city": "Alberobello",
+    "rooms": 20,
+    "gfa_sqm": 1100,
+    "cover_image_url": "https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg",
+    "lat": 40.781,
+    "lng": 17.236,
+    "status": "active"
+  }
+]
