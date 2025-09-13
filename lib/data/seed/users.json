@@ -1,0 +1,65 @@
+[
+  {
+    "id": "user-1",
+    "email": "demo@hotelfoundry.com",
+    "displayName": "Demo User",
+    "createdAt": "2024-11-01T10:00:00Z",
+    "lastActiveAt": "2024-12-15T14:30:00Z",
+    "dealsCount": 3,
+    "role": "admin"
+  },
+  {
+    "id": "user-2",
+    "email": "marcus.reinhart@alpinecapital.com",
+    "displayName": "Marcus Reinhart",
+    "createdAt": "2024-10-15T09:30:00Z",
+    "lastActiveAt": "2024-12-14T16:45:00Z",
+    "dealsCount": 7,
+    "role": "user"
+  },
+  {
+    "id": "user-3",
+    "email": "isabella.rossi@medassset.com",
+    "displayName": "Isabella Rossi",
+    "createdAt": "2024-09-20T11:15:00Z",
+    "lastActiveAt": "2024-12-13T12:20:00Z",
+    "dealsCount": 12,
+    "role": "user"
+  },
+  {
+    "id": "user-4",
+    "email": "james.wellington@coastalhospitality.com",
+    "displayName": "James Wellington",
+    "createdAt": "2024-08-10T14:45:00Z",
+    "lastActiveAt": "2024-12-12T08:30:00Z",
+    "dealsCount": 5,
+    "role": "user"
+  },
+  {
+    "id": "user-5",
+    "email": "sofia.martinez@iberianhotels.es",
+    "displayName": "Sofia Martinez",
+    "createdAt": "2024-07-25T16:20:00Z",
+    "lastActiveAt": "2024-12-10T19:15:00Z",
+    "dealsCount": 9,
+    "role": "user"
+  },
+  {
+    "id": "user-6",
+    "email": "antonio.silva@portugalinvest.pt",
+    "displayName": "Antonio Silva",
+    "createdAt": "2024-06-30T13:10:00Z",
+    "lastActiveAt": "2024-12-09T11:45:00Z",
+    "dealsCount": 4,
+    "role": "user"
+  },
+  {
+    "id": "user-7",
+    "email": "elena.greco@italianproperties.it",
+    "displayName": "Elena Greco",
+    "createdAt": "2024-05-18T10:30:00Z",
+    "lastActiveAt": "2024-12-08T15:20:00Z",
+    "dealsCount": 6,
+    "role": "user"
+  }
+]
