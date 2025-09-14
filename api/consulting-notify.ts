@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -8,14 +7,14 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "Hotel Foundry <noreply@onresend.co
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 const isProd = process.env.VERCEL_ENV === "production";
 
-function ok(res: VercelResponse, body: any = { ok: true }) {
+function ok(res: any, body: any = { ok: true }) {
   return res.status(200).json(body);
 }
-function bad(res: VercelResponse, code: number, msg: string) {
+function bad(res: any, code: number, msg: string) {
   return res.status(code).json({ ok: false, error: msg });
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return bad(res, 405, "Method Not Allowed");
 
   // Simple shared-secret check via header configured in Supabase webhook
