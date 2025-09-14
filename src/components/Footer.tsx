@@ -32,7 +32,7 @@ export default function Footer() {
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-accent-500">
                 <Building2 className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-slate-900">Hotel Foundry</span>
+              Membership
             </Link>
             <p className="text-slate-600 text-sm leading-relaxed mb-4 font-medium">
               Professional hotel underwriting platform for boutique property investments. 

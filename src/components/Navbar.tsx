@@ -15,7 +15,6 @@ export default function Navbar() {
   const navigation = [
     { name: 'Properties', href: '/properties' },
     { name: 'Pricing', href: '/membership' },
-    ...(user && env.FEATURE_STRIPE ? [{ name: 'Billing', href: '/billing' }] : []),
   ];
 
   const isActive = (href: string) => location.pathname === href;

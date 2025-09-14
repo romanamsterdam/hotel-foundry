@@ -44,8 +44,6 @@ import ConsultancyRequestPage from "./features/consulting/ConsultancyRequestPage
 import AdminConsultingPage from "./features/consulting/AdminConsultingPage";
 import ProjectPicker from "./features/roadmap/ProjectPicker";
 import SignInPage from "./pages/auth/SignInPage";
-import BillingPage from "./pages/billing/BillingPage";
-import BillingSuccessPage from "./pages/billing/BillingSuccessPage";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { env } from "./lib/env";
 
@@ -194,46 +192,46 @@ function App() {
                   } />
                 </Route>
 
-              {/* Admin Routes */}
-              <Route path="/admin" element={
-                <RequireAdmin>
-                  <AdminLayout />
-                </RequireAdmin>
-              }>
-                <Route index element={<Navigate to="/admin/sample-properties" replace />} />
-                <Route path="sample-properties" element={<AdminSamplePropertiesPage />} />
-                <Route path="benchmarks" element={<AdminBenchmarksPage />} />
-                <Route path="users" element={<AdminUsersPage />} />
-                <Route path="deals" element={<AdminDealsPage />} />
-                <Route path="deals/:dealId/inspect" element={<AdminDealInspectPage />} />
-                <Route path="roadmap" element={<AdminRoadmapPage />} />
-                <Route path="consulting" element={<AdminConsultingPage />} />
-              </Route>
+                {/* Admin Routes */}
+                <Route path="/admin" element={
+                  <RequireAdmin>
+                    <AdminLayout />
+                  </RequireAdmin>
+                }>
+                  <Route index element={<Navigate to="/admin/sample-properties" replace />} />
+                  <Route path="sample-properties" element={<AdminSamplePropertiesPage />} />
+                  <Route path="benchmarks" element={<AdminBenchmarksPage />} />
+                  <Route path="users" element={<AdminUsersPage />} />
+                  <Route path="deals" element={<AdminDealsPage />} />
+                  <Route path="deals/:dealId/inspect" element={<AdminDealInspectPage />} />
+                  <Route path="roadmap" element={<AdminRoadmapPage />} />
+                  <Route path="consulting" element={<AdminConsultingPage />} />
+                </Route>
 
-              {/* Redirects */}
-              <Route path="/home" element={<Navigate to="/dashboard" replace />} />
-              
-              {/* 404 */}
-              <Route path="*" element={
-                <PublicLayout>
-                  <div className="min-h-screen flex items-center justify-center">
-                    <div className="text-center">
-                      <h1 className="text-4xl font-bold text-slate-900 mb-4">404 - Page Not Found</h1>
-                      <p className="text-slate-600 mb-8">The page you're looking for doesn't exist.</p>
-                      <a href="/" className="text-brand-600 hover:text-brand-700 font-medium">
-                        Return to Home
-                      </a>
+                {/* Redirects */}
+                <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+                
+                {/* Billing Redirect */}
+                <Route path="/billing/*" element={<Navigate to="/membership" replace />} />
+                
+                {/* 404 */}
+                <Route path="*" element={
+                  <PublicLayout>
+                    <div className="min-h-screen flex items-center justify-center">
+                      <div className="text-center">
+                        <h1 className="text-4xl font-bold text-slate-900 mb-4">404 - Page Not Found</h1>
+                        <p className="text-slate-600 mb-8">The page you're looking for doesn't exist.</p>
+                        <a href="/" className="text-brand-600 hover:text-brand-700 font-medium">
+                          Return to Home
+                        </a>
+                      </div>
                     </div>
-                  </div>
-                </PublicLayout>
-              } />
-            </Routes>
+                  </PublicLayout>
+                } />
+              </Routes>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
-        
-        {/* Mount a single Toaster once in the app */}
-        <Toaster />
       </ToastProvider>
     </HelmetProvider>
   );
