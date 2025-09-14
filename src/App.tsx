@@ -1,5 +1,5 @@
 import React from "react";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { useEffect } from "react";
@@ -11,9 +11,6 @@ import ScrollToTop from "./components/ScrollToTop";
 import { AuthProvider } from "./auth/AuthProvider";
 import EnvErrorCard from "./components/common/EnvErrorCard";
 
-// Lazy load pages
-const SignInPage = lazy(() => import("./pages/auth/SignInPage"));
-
 // Layouts
 import LoggedInLayout from "./layouts/LoggedInLayout";
 import AdminLayout from "./layouts/AdminLayout";
@@ -22,11 +19,9 @@ import Footer from "./components/Footer";
 import RequireAdmin from "./components/auth/RequireAdmin";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
-import { Navigate } from "react-router-dom";
-const BillingPage = () => <Navigate to="/membership" replace />;
-
 // Pages (all must be default exports)
 import LandingPage from "./routes/LandingPage";
+import SignInPage from "./pages/auth/SignInPage";
 import DashboardPage from "./routes/DashboardPage";
 import CreateDealPage from "./routes/CreateDealPage";
 import UnderwritingHome from "./routes/UnderwritingHome";
@@ -49,6 +44,7 @@ import UserRoadmapLanding from "./pages/roadmap/UserRoadmapLanding";
 import UserRoadmapPageNew from "./pages/roadmap/UserRoadmapPage";
 import ConsultancyRequestPage from "./features/consulting/ConsultancyRequestPage";
 import AdminConsultingPage from "./features/consulting/AdminConsultingPage";
+import DebugEnv from "./pages/DebugEnv";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { env } from "./lib/env";
 
@@ -198,14 +194,14 @@ function App() {
                     <Route path="consulting" element={<AdminConsultingPage />} />
                   </Route>
 
-                {/* Redirects */}
-                <Route path="/home" element={<Navigate to="/dashboard" replace />} />
-                
                   {/* Redirects */}
                   <Route path="/home" element={<Navigate to="/dashboard" replace />} />
                   
                   {/* Billing Redirect */}
                   <Route path="/billing/*" element={<Navigate to="/membership" replace />} />
+                  
+                  {/* Debug Route */}
+                  <Route path="/debug" element={<DebugEnv />} />
                   
                   {/* 404 */}
                   <Route path="*" element={

@@ -1,24 +1,25 @@
-import * as React from "react";
-import { env } from "../lib/env";
-
+import { ReactNode } from "react";
+import { env } from "../config/env";
 import {
-  AuthProvider as MockAuthProvider,
+  AuthProvider as MockProvider,
   useAuth as useMockAuth,
   type AuthUser,
 } from "./MockAuthProvider";
 import {
-  AuthProvider as SupabaseAuthProvider,
+  AuthProvider as SupabaseProvider,
   useAuth as useSupabaseAuth,
 } from "./SupabaseAuthProvider";
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const Provider =
-    env.AUTH_PROVIDER === "supabase" ? SupabaseAuthProvider : MockAuthProvider;
-  return <Provider>{children}</Provider>;
-};
+const provider = env.AUTH_PROVIDER; // "supabase" | "mock"
+const ProviderImpl = provider === "supabase" ? SupabaseProvider : MockProvider;
+const useSelectedAuth = provider === "supabase" ? useSupabaseAuth : useMockAuth;
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return <ProviderImpl>{children}</ProviderImpl>;
+}
 
 export function useAuth() {
-  return env.AUTH_PROVIDER === "supabase" ? useSupabaseAuth() : useMockAuth();
+  return useSelectedAuth();
 }
 
 export type { AuthUser };

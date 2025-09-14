@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../ui/toast";
-import { env } from "../../lib/env";
+import { env } from "../../config/env";
 import type { ConsultingRequestInput } from "../../types/consulting";
 
 // If you use shadcn/ui, uncomment these and remove the minimal elements below

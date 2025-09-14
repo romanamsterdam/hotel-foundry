@@ -1,17 +1,18 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { useToast } from "../../components/ui/toast";
-import { env } from "../../lib/env";
+import { env } from "../../config/env";
 
 export default function SignInPage() {
-  const { login, signIn } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  const isSupabase = env.AUTH_PROVIDER === "supabase";
   
   const handleSupabaseSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +31,10 @@ export default function SignInPage() {
       setLoading(false);
     }
   };
+
+  const handleMockSignIn = () => {
+    signIn();
+  };
   
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
@@ -38,14 +43,14 @@ export default function SignInPage() {
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-bold text-slate-900">Sign in</CardTitle>
             <p className="text-slate-600 mt-2">
-              {env.AUTH_PROVIDER === "supabase" 
+              {isSupabase 
                 ? "Enter your email to receive a magic link"
                 : "This is a temporary dev sign-in. Supabase will replace this."
               }
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {env.AUTH_PROVIDER === "supabase" ? (
+            {isSupabase ? (
               <form onSubmit={handleSupabaseSignIn} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -74,7 +79,7 @@ export default function SignInPage() {
             ) : (
               <>
                 <Button 
-                  onClick={() => login()} 
+                  onClick={handleMockSignIn} 
                   className="w-full bg-brand-600 hover:bg-brand-700 text-white"
                 >
                   Continue as Guest
