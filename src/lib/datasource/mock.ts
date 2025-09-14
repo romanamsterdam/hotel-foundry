@@ -1,5 +1,4 @@
 import { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
-import type { ConsultingRequestInput } from "../../types/consulting";
 
 const LS_KEY = "hf-mock";
 type Store = { projects: Project[]; tasks: RoadmapTask[]; consulting: ConsultingRequest[]; };
@@ -28,7 +27,7 @@ let store: Store = init;
 const persist = () => localStorage.setItem(LS_KEY, JSON.stringify(store));
 const genId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
-function buildConsultingRequest(input: ConsultingRequestInput): ConsultingRequest {
+function buildConsultingRequest(input: any): ConsultingRequest {
   const req: ConsultingRequest = {
     id: genId("c"),
     user_id: input.user_id ?? null,
@@ -41,11 +40,18 @@ function buildConsultingRequest(input: ConsultingRequestInput): ConsultingReques
   return req;
 }
 
-export async function createConsultingRequest(input: ConsultingRequestInput) {
-  const req = buildConsultingRequest(input);
-  store.consulting.push(req);
-  persist();
-  return req;
+export async function createConsultingRequest(
+  input: any
+): Promise<{ data: ConsultingRequest | null; error?: string | null }> {
+  try {
+    const row = buildConsultingRequest(input);
+    store.consulting.push(row);
+    persist();
+    return { data: row, error: null };
+  } catch (e: any) {
+    console.error("[mock createConsultingRequest] failed:", e);
+    return { data: null, error: e?.message ?? "Unknown error" };
+  }
 }
 export const mockDs: DataSource = {
   async listProjects() { return [...store.projects]; },

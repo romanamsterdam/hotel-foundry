@@ -1,7 +1,6 @@
 import { supabase } from "../../lib/supabaseClient";
-import type { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
 
-function coerceConsulting(input: ConsultingRequestInput) {
+function coerceConsulting(input: any) {
   const raw = input.estimated_hours;
   const hours = raw === '' || raw == null ? null : Number(raw);
   return {
@@ -14,6 +13,29 @@ function coerceConsulting(input: ConsultingRequestInput) {
     user_id: input.user_id ?? null,
     assignee: input.assignee ?? null,
   };
+}
+
+export async function createConsultingRequest(
+  input: any
+): Promise<{ data: ConsultingRequest | null; error?: string | null }> {
+  try {
+    const payload = coerceConsulting(input);
+    
+    const { data, error } = await supabase!
+      .from("consulting_requests")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[supabase createConsultingRequest] error:", error);
+      return { data: null, error: error.message };
+    }
+    return { data: data as ConsultingRequest, error: null };
+  } catch (e: any) {
+    console.error("[supabase createConsultingRequest] threw:", e);
+    return { data: null, error: e?.message ?? "Unexpected error" };
+  }
 }
 
 export const supabaseDs: DataSource = {

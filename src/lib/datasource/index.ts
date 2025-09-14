@@ -9,6 +9,7 @@ export const setDs = (ds: DataSource) => { impl = ds; };
 export const getDs = (): DataSource => impl as DataSource;
 
 export const initDataSource = async () => {
+  console.log("[datasource] selecting:", env.DATA_SOURCE);
   if (env.DATA_SOURCE === "supabase") {
     // Check if Supabase is properly configured
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !supabase) {
@@ -16,8 +17,10 @@ export const initDataSource = async () => {
     }
     const { supabaseDs } = await import("./supabase");
     setDs(supabaseDs);
+    console.log("[datasource] initialized: supabase");
   } else {
     const { mockDs } = await import("./mock");
     setDs(mockDs);
+    console.log("[datasource] initialized: mock");
   }
 };

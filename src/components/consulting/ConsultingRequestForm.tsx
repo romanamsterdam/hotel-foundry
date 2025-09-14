@@ -47,12 +47,12 @@ export default function ConsultingRequestForm() {
   // Import the appropriate create function based on data source
   const createConsultingRequest = React.useMemo(() => {
     if (env.DATA_SOURCE === "supabase") {
-      return async (input: ConsultingRequestInput) => {
+      return async (input: any) => {
         const { createConsultingRequest } = await import("../../lib/datasource/supabase");
         return createConsultingRequest(input);
       };
     } else {
-      return async (input: ConsultingRequestInput) => {
+      return async (input: any) => {
         const { createConsultingRequest } = await import("../../lib/datasource/mock");
         return createConsultingRequest(input);
       };
@@ -71,8 +71,8 @@ export default function ConsultingRequestForm() {
         return;
       }
 
-      // Insert to database
-      await createConsultingRequest({
+      // Insert to database with standardized API
+      const { data, error } = await createConsultingRequest({
         name,
         email,
         expertise,
@@ -81,6 +81,12 @@ export default function ConsultingRequestForm() {
         message: summary,
         user_id: user?.id ?? null,
       });
+
+      if (error) {
+        console.error("[Consulting submit] API error:", error);
+        toast.error(`Could not submit: ${error}`);
+        return;
+      }
 
       toast.success("Thanks! We'll review and send a proposal within 24 hours.");
       // Optional: clear form
@@ -93,9 +99,8 @@ export default function ConsultingRequestForm() {
         setEmail("");
       }
     } catch (e: any) {
-      toast.error(e?.message ?? "Submit failed. Please try again.");
-      // still keep console for QA
-      console.error("Consulting submit error:", e);
+      console.error("[Consulting submit] threw:", e);
+      toast.error(e?.message ?? "Unexpected error. See console for details.");
     } finally {
       setSubmitting(false);
     }
