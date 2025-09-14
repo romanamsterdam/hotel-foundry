@@ -1,7 +1,11 @@
 import * as React from "react";
 import { useState } from "react";
+import { useEffect } from "react";
 import { cn } from "../../lib/utils";
-import { submitConsultingRequest } from "../../features/consulting/api";
+import { useAuth } from "../../auth/AuthProvider";
+import { useToast } from "../ui/toast";
+import { env } from "../../lib/env";
+import type { ConsultingRequestInput } from "../../types/consulting";
 
 // If you use shadcn/ui, uncomment these and remove the minimal elements below
 // import { Button } from "@/components/ui/button";
@@ -13,6 +17,7 @@ import { submitConsultingRequest } from "../../features/consulting/api";
 // import { Checkbox } from "@/components/ui/checkbox";
 
 type Seniority = "junior" | "standard" | "partner";
+type Expertise = "operations" | "finance" | "development" | "other";
 
 const HOURLY: Record<Seniority, number> = {
   junior: 80,
@@ -21,56 +26,74 @@ const HOURLY: Record<Seniority, number> = {
 };
 
 export default function ConsultingRequestForm() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [expertise, setExpertise] = useState<string[]>([]);
+  const [expertise, setExpertise] = useState<Expertise>("operations");
   const [hoursHint, setHoursHint] = useState<string>("");
   const [summary, setSummary] = useState("");
   const [seniority, setSeniority] = useState<Seniority>("standard");
   const [submitting, setSubmitting] = useState(false);
-  const [ok, setOk] = useState<null | string>(null);
-  const [err, setErr] = useState<null | string>(null);
 
-  const toggleExpertise = (key: string) =>
-    setExpertise((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+  // Prefill from auth when user signs in
+  useEffect(() => {
+    if (user) {
+      setName(v => v || user.name || "");
+      setEmail(v => v || user.email || "");
+    }
+  }, [user?.id]);
+
+  // Import the appropriate create function based on data source
+  const createConsultingRequest = React.useMemo(() => {
+    if (env.DATA_SOURCE === "supabase") {
+      return async (input: ConsultingRequestInput) => {
+        const { createConsultingRequest } = await import("../../lib/datasource/supabase");
+        return createConsultingRequest(input);
+      };
+    } else {
+      return async (input: ConsultingRequestInput) => {
+        const { createConsultingRequest } = await import("../../lib/datasource/mock");
+        return createConsultingRequest(input);
+      };
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    setErr(null);
-    setOk(null);
+    
     try {
       // basic requireds (you already have required on inputs—this is belt & braces)
-      if (!email || !summary) {
-        setErr("Please provide your email and a short project summary.");
+      if (!email.trim() || !summary.trim()) {
+        toast.error("Please provide your email and a short project summary.");
         setSubmitting(false);
         return;
       }
 
-      // Insert to Supabase
-      await submitConsultingRequest({
+      // Insert to database
+      await createConsultingRequest({
         name,
         email,
-        company: undefined,         // add if you capture it
-        summary,
         expertise,
         seniority,
-        hourly: HOURLY[seniority],
-        hoursHint,
+        estimated_hours: hoursHint ? Number(hoursHint) || null : null,
+        message: summary,
+        user_id: user?.id ?? null,
       });
 
-      setOk("Thanks! We'll review and send a proposal within 24 hours.");
+      toast.success("Thanks! We'll review and send a proposal within 24 hours.");
       // Optional: clear form
-      setName("");
-      setEmail("");
-      setExpertise([]);
-      setHoursHint("");
       setSummary("");
-      setSeniority("standard");
+      setHoursHint("");
+      setExpertise("operations");
+      // Keep name/email if user is signed in
+      if (!user) {
+        setName("");
+        setEmail("");
+      }
     } catch (e: any) {
-      setErr(e?.message ?? "Submit failed. Please try again.");
+      toast.error(e?.message ?? "Submit failed. Please try again.");
       // still keep console for QA
       console.error("Consulting submit error:", e);
     } finally {
@@ -127,6 +150,9 @@ export default function ConsultingRequestForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
               />
+              {user && email === user.email && (
+                <p className="mt-1 text-xs text-slate-500">Using your account email</p>
+              )}
             </div>
           </div>
 
@@ -145,23 +171,20 @@ export default function ConsultingRequestForm() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => toggleExpertise(key)}
+                  onClick={() => setExpertise(key as Expertise)}
                   className={cn(
                     "rounded-xl border p-3 text-left transition",
-                    expertise.includes(key)
+                    expertise === key
                       ? "border-black"
                       : "hover:border-slate-400"
                   )}
-                  aria-pressed={expertise.includes(key)}
+                  aria-pressed={expertise === key}
                 >
                   <div className="font-medium">{title}</div>
                   <div className="text-xs text-muted-foreground">{desc}</div>
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pick one or more. We'll assemble the right team.
-            </p>
           </div>
 
           {/* Seniority selection */}
@@ -239,17 +262,13 @@ export default function ConsultingRequestForm() {
             <p className="text-sm text-muted-foreground">
               <span className="font-medium">Response time:</span> within 24 hours.
             </p>
-            <div className="flex flex-col items-end space-y-2">
-              {err && <p className="text-sm text-rose-600">{err}</p>}
-              {ok && <p className="text-sm text-emerald-700">{ok}</p>}
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !email.trim() || !summary.trim()}
               className="inline-flex items-center rounded-xl bg-black px-5 py-2.5 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? "Submitting..." : "Request a Proposal"}
             </button>
-            </div>
           </div>
         </form>
       </div>

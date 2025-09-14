@@ -1,5 +1,35 @@
 import { supabase } from "../../lib/supabaseClient";
+import type { ConsultingRequestInput } from "../../types/consulting";
 import type { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
+
+function coerceConsulting(input: ConsultingRequestInput) {
+  const raw = input.estimated_hours;
+  const hours = raw === '' || raw == null ? null : Number(raw);
+  return {
+    name: input.name ?? null,
+    email: input.email ?? null,
+    expertise: input.expertise,
+    seniority: input.seniority,
+    estimated_hours: Number.isFinite(hours) ? hours : null,
+    message: input.message ?? null,
+    user_id: input.user_id ?? null,
+    assignee: input.assignee ?? null,
+  };
+}
+
+export async function createConsultingRequest(input: ConsultingRequestInput) {
+  const payload = coerceConsulting(input);
+  const { data, error } = await supabase!
+    .from("consulting_requests")
+    .insert([payload])
+    .select()
+    .single();
+  if (error) {
+    console.error("consulting insert failed:", error);
+    throw error;
+  }
+  return data;
+}
 
 export const supabaseDs: DataSource = {
   async listProjects(): Promise<Project[]> {
