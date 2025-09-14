@@ -3,41 +3,45 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY!);
 const SUPPORT_INBOX = process.env.SUPPORT_INBOX || "support@hotelfoundry.app";
 const SUPPORT_INBOX_PREVIEW = process.env.SUPPORT_INBOX_PREVIEW || SUPPORT_INBOX;
-const FROM_EMAIL = process.env.FROM_EMAIL || "Hotel Foundry <noreply@onresend.com>";
+const FROM_EMAIL = process.env.FROM_EMAIL || "Hotel Foundry <support@hotelfoundry.app>";
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 const isProd = process.env.VERCEL_ENV === "production";
 
-function ok(res: any, body: any = { ok: true }) {
-  return res.status(200).json(body);
-}
-function bad(res: any, code: number, msg: string) {
-  return res.status(code).json({ ok: false, error: msg });
-}
-
 export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") return bad(res, 405, "Method Not Allowed");
-
-  // Simple shared-secret check via header configured in Supabase webhook
-  const headerSecret = (req.headers["x-webhook-secret"] as string) || "";
-  if (!WEBHOOK_SECRET || headerSecret !== WEBHOOK_SECRET) {
-    console.error("[consulting-notify] invalid or missing webhook secret");
-    return bad(res, 401, "invalid signature");
+  if (req.method !== "POST") {
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
-  // Supabase DB webhook body shape (row-level)
-  const payload: any = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-  const row = payload?.record ?? payload?.new ?? payload ?? {};
+  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
+  const headerSecret = (req.headers["x-webhook-secret"] as string) || "";
+  if (!WEBHOOK_SECRET || headerSecret !== WEBHOOK_SECRET) {
+    console.error("[consulting-notify] invalid secret");
+    return res.status(401).json({ ok: false, error: "invalid_secret" });
+  }
 
-  const {
-    id,
-    created_at,
-    name,
-    email,
-    expertise,
-    seniority,
-    estimated_hours,
-    message,
-  } = row;
+  const RESEND_API_KEY_PRESENT = !!process.env.RESEND_API_KEY;
+  const FROM_EMAIL = process.env.FROM_EMAIL || "";
+  const SUPPORT_INBOX = process.env.SUPPORT_INBOX || "";
+  const SUPPORT_INBOX_PREVIEW = process.env.SUPPORT_INBOX_PREVIEW || SUPPORT_INBOX;
+  const isProd = process.env.VERCEL_ENV === "production";
+  const to = isProd ? SUPPORT_INBOX : SUPPORT_INBOX_PREVIEW;
+
+  if (!RESEND_API_KEY_PRESENT) {
+    console.error("[consulting-notify] missing RESEND_API_KEY");
+    return res.status(500).json({ ok: false, error: "missing_RESEND_API_KEY" });
+  }
+  if (!FROM_EMAIL) {
+    console.error("[consulting-notify] missing FROM_EMAIL");
+    return res.status(500).json({ ok: false, error: "missing_FROM_EMAIL" });
+  }
+  if (!to) {
+    console.error("[consulting-notify] missing recipient (SUPPORT_INBOX/preview)");
+    return res.status(500).json({ ok: false, error: "missing_recipient" });
+  }
+
+  let payload: any = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  const row = payload?.record ?? payload?.new ?? payload ?? {};
+  const { id, created_at, name, email, expertise, seniority, estimated_hours, message } = row;
 
   const subject = `New consulting request${expertise ? ` (${expertise})` : ""} — ${name ?? "Unknown"}`;
   const text = `
@@ -54,11 +58,12 @@ Estimated hours: ${estimated_hours ?? "—"}
 
 Message:
 ${message ?? "—"}
-`.trim();
-
-  const to = isProd ? SUPPORT_INBOX : SUPPORT_INBOX_PREVIEW;
+  `.trim();
 
   try {
+    const { Resend } = await import("resend");
+    const resend = new Resend(process.env.RESEND_API_KEY!);
+
     const result: any = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
@@ -75,8 +80,11 @@ ${message ?? "—"}
     });
 
     if (result?.error) {
-      return res.status(500).json({ ok: false, error: result.error?.message || "resend_failed", to, from: FROM_EMAIL });
+      return res
+        .status(500)
+        .json({ ok: false, error: result.error?.message || String(result.error), to, from: FROM_EMAIL });
     }
+
     return res.status(200).json({ ok: true, id: result?.id ?? null, to, from: FROM_EMAIL });
   } catch (e: any) {
     console.error("[consulting-notify] send threw", e);
