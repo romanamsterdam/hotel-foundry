@@ -59,20 +59,28 @@ ${message ?? "—"}
   const to = isProd ? SUPPORT_INBOX : SUPPORT_INBOX_PREVIEW;
 
   try {
-    const result = await resend.emails.send({
+    const result: any = await resend.emails.send({
       from: FROM_EMAIL,
       to: [to],
       subject,
       text,
     });
-    if ((result as any)?.error) {
-      console.error("[consulting-notify] Resend error:", (result as any).error);
-      return bad(res, 500, "resend_failed");
+
+    console.log("[consulting-notify] send result", {
+      env: process.env.VERCEL_ENV,
+      to,
+      from: FROM_EMAIL,
+      id: result?.id ?? null,
+      error: result?.error ?? null,
+    });
+
+    if (result?.error) {
+      return res.status(500).json({ ok: false, error: result.error?.message || "resend_failed", to, from: FROM_EMAIL });
     }
-    return ok(res);
+    return res.status(200).json({ ok: true, id: result?.id ?? null, to, from: FROM_EMAIL });
   } catch (e: any) {
-    console.error("[consulting-notify] send threw:", e);
-    return bad(res, 500, e?.message ?? "send_failed");
+    console.error("[consulting-notify] send threw", e);
+    return res.status(500).json({ ok: false, error: e?.message ?? "send_failed", to, from: FROM_EMAIL });
   }
 }
 
