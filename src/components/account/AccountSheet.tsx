@@ -119,7 +119,7 @@ export default function AccountSheet({ open, onOpenChange }: Props) {
               <TabsList className="mt-3 grid grid-cols-3 w-full mb-3">
                 <TabsTrigger value="profile">Profile</TabsTrigger>
                 <TabsTrigger value="security">Security</TabsTrigger>
-                <TabsTrigger value="billing">Billing</TabsTrigger>
+                <TabsTrigger value="membership">Membership</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -182,7 +182,7 @@ export default function AccountSheet({ open, onOpenChange }: Props) {
               </TabsContent>
 
               {/* BILLING */}
-              <TabsContent value="billing" className="px-6 py-5 space-y-5">
+              <TabsContent value="membership" className="px-6 py-5 space-y-5">
                 <div className="space-y-3">
                   <Label>Subscription tier</Label>
                   <RadioGroup

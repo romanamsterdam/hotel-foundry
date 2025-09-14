@@ -22,6 +22,9 @@ import Footer from "./components/Footer";
 import RequireAdmin from "./components/auth/RequireAdmin";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
+import { Navigate } from "react-router-dom";
+const BillingPage = () => <Navigate to="/membership" replace />;
+
 // Pages (all must be default exports)
 import LandingPage from "./routes/LandingPage";
 import DashboardPage from "./routes/DashboardPage";
