@@ -1,16 +1,11 @@
 import { supabase } from "../../lib/supabaseClient";
 import type { ProjectInput } from "../../types/projects";
+import type { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
 
-// helper to normalize input into a payload the DB accepts
+// ---- helpers (single copy) ----
 const normalizeProjectInput = (input: string | ProjectInput) => {
   if (typeof input === "string") {
-    return {
-      property_id: null,
-      name: input,
-      stage: null,
-      currency: null,
-      kpis: null,
-    };
+    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
   }
   return {
     property_id: input.property_id ?? null,
@@ -21,45 +16,51 @@ const normalizeProjectInput = (input: string | ProjectInput) => {
   };
 };
 
-// keep ONE implementation path for createProject that surfaces {data,error}
-async function createProjectUnified(input: string | ProjectInput): Promise<{ data: any | null; error?: string | null }> {
+async function createProjectUnified(
+  input: string | ProjectInput
+): Promise<{ data: any | null; error?: string | null }> {
   const payload = normalizeProjectInput(input);
+  const { data: userData } = await supabase.auth.getUser();
+  console.log("[createProject][supabase] user", userData?.user?.id ?? null, "payload", payload);
   try {
-    const { data, error } = await supabase!
+    const { data, error } = await supabase
       .from("projects")
       .insert(payload)
       .select()
       .single();
     if (error) {
-      console.error("[createProject][supabase] error:", error, { payload });
+      console.error("[createProject][supabase] insert error:", error, { payload });
       return { data: null, error: error.message };
     }
+    console.log("[createProject][supabase] inserted id", data?.id);
     return { data, error: null };
   } catch (e: any) {
     console.error("[createProject][supabase] threw:", e, { payload });
     return { data: null, error: e?.message ?? "insert_failed" };
   }
 }
-import type { ProjectInput } from "../../types/projects";
 
+// ---- datasource impl (single source of truth) ----
 export const supabaseDs: DataSource = {
   async listProjects(): Promise<Project[]> {
-    const { data, error } = await supabase!.from("projects")
+    const { data, error } = await supabase
+      .from("projects")
       .select("*")
       .order("created_at", { ascending: true });
     if (error) throw error;
     return data as Project[];
   },
 
-  // NEW signature: accepts string OR ProjectInput
-  async createProject(input: string | ProjectInput): Promise<any> {
+  // unified signature: string | ProjectInput
+  async createProject(input: string | ProjectInput): Promise<Project> {
     const { data, error } = await createProjectUnified(input);
     if (error) throw new Error(error);
-    return data;
+    return data as Project;
   },
 
   async listTasks(project_id: UUID): Promise<RoadmapTask[]> {
-    const { data, error } = await supabase!.from("roadmap_tasks")
+    const { data, error } = await supabase
+      .from("roadmap_tasks")
       .select("*")
       .eq("project_id", project_id)
       .order("created_at", { ascending: true });
@@ -67,9 +68,12 @@ export const supabaseDs: DataSource = {
     return data as RoadmapTask[];
   },
 
-  async upsertTask(input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }): Promise<RoadmapTask> {
+  async upsertTask(
+    input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }
+  ): Promise<RoadmapTask> {
     if (input.id) {
-      const { data, error } = await supabase!.from("roadmap_tasks")
+      const { data, error } = await supabase
+        .from("roadmap_tasks")
         .update(input)
         .eq("id", input.id)
         .select()
@@ -77,7 +81,8 @@ export const supabaseDs: DataSource = {
       if (error) throw error;
       return data as RoadmapTask;
     } else {
-      const { data, error } = await supabase!.from("roadmap_tasks")
+      const { data, error } = await supabase
+        .from("roadmap_tasks")
         .insert(input)
         .select()
         .single();
@@ -87,7 +92,8 @@ export const supabaseDs: DataSource = {
   },
 
   async listConsulting(): Promise<ConsultingRequest[]> {
-    const { data, error } = await supabase!.from("consulting_requests")
+    const { data, error } = await supabase
+      .from("consulting_requests")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -95,7 +101,8 @@ export const supabaseDs: DataSource = {
   },
 
   async updateConsulting(id: UUID, patch: Partial<ConsultingRequest>): Promise<ConsultingRequest> {
-    const { data, error } = await supabase!.from("consulting_requests")
+    const { data, error } = await supabase
+      .from("consulting_requests")
       .update(patch)
       .eq("id", id)
       .select()
@@ -104,35 +111,3 @@ export const supabaseDs: DataSource = {
     return data as ConsultingRequest;
   },
 };
-
-function coerceConsulting(input: any) {
-  const raw = input.estimated_hours;
-  const hours = raw === '' || raw == null ? null : Number(raw);
-  return {
-    name: input.name ?? null,
-    email: input.email ?? null,
-    expertise: input.expertise,
-    seniority: input.seniority,
-    estimated_hours: Number.isFinite(hours) ? hours : null,
-    message: input.message ?? null,
-    user_id: input.user_id ?? null,
-    assignee: input.assignee ?? null,
-  };
-}
-
-export async function createProject(input: ProjectInput): Promise<{data: any|null; error?: string|null}> {
-  return createProjectUnified(input);
-}
-
-export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("created_at", { ascending: false });
-  
-  if (error) {
-    console.error("[listMyProjects] supabase error:", error);
-    return { data: [], error: error.message };
-  }
-  return { data, error: null };
-}

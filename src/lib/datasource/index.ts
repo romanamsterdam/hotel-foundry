@@ -9,12 +9,11 @@ export const setDs = (ds: DataSource) => { impl = ds; };
 export const getDs = (): DataSource => impl as DataSource;
 
 // Re-export project functions for UI
-export const createProject = async (input: any) => {
+export const createProject = async (input: string | ProjectInput) => {
   if (!impl?.createProject) {
     throw new Error("DataSource not initialized");
   }
-  const res = await impl.createProject(input);
-  return res;
+  return impl.createProject(input);
 };
 
 export const listMyProjects = async () => {
