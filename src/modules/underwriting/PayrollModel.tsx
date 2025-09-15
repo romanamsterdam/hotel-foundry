@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useToast } from '../../components/ui/toast';
+import { useProjectSave } from '../../lib/persist/ProjectSaveContext';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { setCompleted } from '../../lib/uwProgress';
 import { getTotalRooms } from '../../lib/rooms';
@@ -56,6 +57,7 @@ const compStrategyLabels = {
 
 export default function PayrollModel({ dealId, onSaved }: PayrollModelProps) {
   const { toast } = useToast();
+  const { saveNow } = useProjectSave();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [payrollState, setPayrollState] = useState<PayrollState | null>(null);
   const [originalState, setOriginalState] = useState<PayrollState | null>(null);
@@ -246,6 +248,10 @@ export default function PayrollModel({ dealId, onSaved }: PayrollModelProps) {
     setSaveState('saving');
     
     try {
+      // Save to Supabase first
+      await saveNow("Payroll Model");
+      
+      // Then update local storage
       const updatedDeal: Deal = {
         ...deal,
         payrollModel: payrollState,

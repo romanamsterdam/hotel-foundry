@@ -4,6 +4,7 @@ import { ExternalLink, Loader2, Check, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { useToast } from '../../components/ui/toast';
+import { useProjectSave } from '../../lib/persist/ProjectSaveContext';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { setCompleted } from '../../lib/uwProgress';
 import { totalRooms } from '../../lib/rooms';
@@ -31,6 +32,7 @@ interface PropertyDetailsFormProps {
 export default function PropertyDetailsForm({ dealId, onSaved }: PropertyDetailsFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { saveNow } = useProjectSave();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -133,7 +135,7 @@ export default function PropertyDetailsForm({ dealId, onSaved }: PropertyDetails
 
     try {
       // Save to Supabase first
-      await persistToBackend("Property Details");
+      await saveNow("Property Details");
       
       // Then update local storage for immediate UI updates
       const updatedDeal: Deal = {

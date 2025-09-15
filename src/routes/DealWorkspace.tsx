@@ -16,6 +16,8 @@ import { weightedADR, revpar, roomsMix, budgetStatus } from '../lib/kpis';
 import { genericBenchmarks } from '../data/benchmarks';
 import DealWelcome from '../components/DealWelcome';
 import StageProgress from '../components/StageProgress';
+import { ProjectSaveProvider } from '../lib/persist/ProjectSaveContext';
+import type { PersistPayload } from '../lib/persist/ProjectSaveContext';
 import PropertyDetailsForm from '../modules/underwriting/PropertyDetailsForm';
 import InvestmentBudgetTable from '../modules/underwriting/InvestmentBudgetTable';
 import RoomRevenue from '../modules/underwriting/RoomRevenue';
@@ -44,6 +46,7 @@ export default function DealWorkspace() {
   const [refreshToken, setRefreshToken] = useState<string>('');
   const [kpiUpdateKey, setKpiUpdateKey] = useState<number>(0);
   const [showPhotoLightbox, setShowPhotoLightbox] = useState<boolean>(false);
+  const [projectId, setProjectId] = useState<string | undefined>(id);
 
   useEffect(() => {
     if (!id) {
@@ -58,8 +61,62 @@ export default function DealWorkspace() {
     }
 
     setDeal(foundDeal);
+    setProjectId(id);
   }, [id, navigate, refreshToken]);
 
+  // Build payload for Supabase saves
+  const payload: PersistPayload = useMemo(() => {
+    if (!deal) return { name: "Untitled Deal", kpis: null };
+    
+    // Build comprehensive KPIs from current deal state
+    const kpis = {
+      rooms: getTotalRooms(deal),
+      location: deal.location,
+      propertyType: deal.propertyType,
+      starRating: deal.stars,
+      currency: deal.currency,
+      gfaSqm: deal.gfaSqm,
+      purchasePrice: deal.purchasePrice,
+      facilities: deal.facilities || [],
+      roomTypes: deal.roomTypes || [],
+      // Add revenue KPIs if available
+      ...(deal.roomRevenue && {
+        avgADR: deal.roomRevenue.totals.avgADR,
+        avgOccupancy: deal.roomRevenue.totals.avgOccPct,
+        avgRevPAR: deal.roomRevenue.totals.avgRevPAR,
+        totalRoomsRevenue: deal.roomRevenue.totals.roomsRevenue
+      }),
+      // Add budget KPIs if available
+      ...(deal.budget && {
+        totalInvestment: deal.budget.grandTotal,
+        costPerRoom: getTotalRooms(deal) > 0 ? deal.budget.grandTotal / getTotalRooms(deal) : 0,
+        costPerSqm: deal.gfaSqm > 0 ? deal.budget.grandTotal / deal.gfaSqm : 0,
+        contingencyPct: deal.budget.contingencyPct
+      }),
+      // Add payroll KPIs if available
+      ...(deal.payrollModel && {
+        totalPayrollAnnual: deal.payrollModel.simple.ftePerRoom * deal.payrollModel.simple.baseReceptionSalary * getTotalRooms(deal),
+        ftePerRoom: deal.payrollModel.simple.ftePerRoom
+      })
+    };
+
+    return {
+      id: projectId,
+      name: deal.name,
+      property_id: null, // Will be set from template selection
+      stage: "underwriting",
+      currency: deal.currency,
+      kpis
+    };
+  }, [deal, projectId]);
+
+  const handleAfterSave = (row: Project) => {
+    if (!projectId && row?.id) {
+      setProjectId(row.id);
+      // Optionally update URL to reflect new ID
+      // navigate(`/underwriting/${row.id}`, { replace: true });
+    }
+  };
   const handleDelete = () => {
     if (!deal) return;
     if (confirm(`Delete "${deal.name}"? This action cannot be undone.`)) {
@@ -113,6 +170,7 @@ export default function DealWorkspace() {
   const bud = budgetStatus(deal);
 
   return (
+    <ProjectSaveProvider buildPayload={() => payload} onSaved={handleAfterSave}>
     <div>
       {/* Header */}
       <div className="mb-8">
@@ -351,5 +409,6 @@ export default function DealWorkspace() {
         </div>
       )}
     </div>
+    </ProjectSaveProvider>
   );
 }

@@ -3,6 +3,7 @@ import { TrendingUp, RotateCcw, Info, DollarSign } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { useToast } from '../../components/ui/toast';
+import { useProjectSave } from '../../lib/persist/ProjectSaveContext';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { setCompleted } from '../../lib/uwProgress';
 import { getTotalRooms } from '../../lib/rooms';
@@ -72,6 +73,7 @@ function detectPreset(months: MonthRow[]): SeasonalityPresetKey | 'custom' {
 
 export default function RoomRevenue({ dealId, onSaved }: RoomRevenueProps) {
   const { toast } = useToast();
+  const { saveNow } = useProjectSave();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [model, setModel] = useState<RoomRevenueModel | null>(null);
   const [originalModel, setOriginalModel] = useState<RoomRevenueModel | null>(null);
@@ -216,7 +218,7 @@ export default function RoomRevenue({ dealId, onSaved }: RoomRevenueProps) {
     
     try {
       // Save to Supabase first
-      await persistToBackend("Room Revenue");
+      await saveNow("Room Revenue");
       
       // Then update local storage
       const updatedDeal: Deal = {

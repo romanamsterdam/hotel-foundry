@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { useToast } from '../../components/ui/toast';
+import { useProjectSave } from '../../lib/persist/ProjectSaveContext';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { setCompleted } from '../../lib/uwProgress';
 import { getTotalRooms } from '../../lib/rooms';
@@ -33,6 +34,7 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
 
 export default function OperatingExpenses({ dealId, onSaved }: OperatingExpensesProps) {
   const { toast } = useToast();
+  const { saveNow } = useProjectSave();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [opexState, setOpexState] = useState<OpexState | null>(null);
   const [originalState, setOriginalState] = useState<OpexState | null>(null);
@@ -151,7 +153,7 @@ export default function OperatingExpenses({ dealId, onSaved }: OperatingExpenses
     
     try {
       // Save to Supabase first
-      await persistToBackend("Operating Expenses");
+      await saveNow("Operating Expenses");
       
       // Then update local storage
       const updatedDeal: Deal = {

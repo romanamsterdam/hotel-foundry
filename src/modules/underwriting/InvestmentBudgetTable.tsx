@@ -3,6 +3,7 @@ import { Info, TrendingUp, Calculator, Table } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import { useToast } from '../../components/ui/toast';
+import { useProjectSave } from '../../lib/persist/ProjectSaveContext';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { setCompleted } from '../../lib/uwProgress';
 import { getTotalRooms } from '../../lib/rooms';
@@ -163,6 +164,7 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
 
 export default function InvestmentBudgetTable({ dealId, onSaved }: InvestmentBudgetTableProps) {
   const { toast } = useToast();
+  const { saveNow } = useProjectSave();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [budget, setBudget] = useState<DealBudget | null>(null);
   const [originalBudget, setOriginalBudget] = useState<DealBudget | null>(null);
@@ -396,7 +398,7 @@ export default function InvestmentBudgetTable({ dealId, onSaved }: InvestmentBud
     
     try {
       // Save to Supabase first
-      await persistToBackend("Investment Budget");
+      await saveNow("Investment Budget");
       
       // Then update local storage
       const updatedDeal: Deal = {
