@@ -9,16 +9,19 @@ export const setDs = (ds: DataSource) => { impl = ds; };
 export const getDs = (): DataSource => impl as DataSource;
 
 // Re-export project functions for UI
-export const createProject = (input: any) => {
-  if (impl?.createProject) {
-    return impl.createProject(input);
+export const createProject = async (input: any) => {
+  if (!impl?.createProject) {
+    throw new Error("DataSource not initialized");
   }
-  throw new Error("DataSource not initialized");
+  const res = await impl.createProject(input);
+  return res;
 };
 
-export const listMyProjects = () => {
-  if (impl?.listMyProjects) {
-    return impl.listMyProjects();
+export const listMyProjects = async () => {
+  if (impl?.listMyProjects) return impl.listMyProjects();
+  if (impl?.listProjects) {
+    const rows = await impl.listProjects();
+    return { data: rows, error: null };
   }
   throw new Error("DataSource not initialized");
 };

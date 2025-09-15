@@ -1,6 +1,31 @@
 import { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
 import type { ProjectInput } from "../../types/projects";
 
+// helper to normalize input into a payload the DB accepts
+const normalizeProjectInput = (input: string | ProjectInput) => {
+  if (typeof input === "string") {
+    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
+  }
+  return {
+    property_id: input.property_id ?? null,
+    name: input.name,
+    stage: input.stage ?? null,
+    currency: input.currency ?? null,
+    kpis: input.kpis ?? null,
+  };
+};
+
+function buildProject(input: string | ProjectInput) {
+  const p = normalizeProjectInput(input);
+  return {
+    id: genId("p"),
+    created_at: new Date().toISOString(),
+    owner_id: "mock-user",
+    ...p,
+  };
+}
+import type { ProjectInput } from "../../types/projects";
+
 const LS_KEY = "hf-mock";
 type Store = { projects: Project[]; tasks: RoadmapTask[]; consulting: ConsultingRequest[]; };
 
@@ -28,20 +53,7 @@ let store: Store = init;
 const persist = () => localStorage.setItem(LS_KEY, JSON.stringify(store));
 const genId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
-function buildProject(input: ProjectInput) {
-  return {
-    id: genId("p"),
-    created_at: new Date().toISOString(),
-    owner_id: "mock-user",
-    property_id: input.property_id ?? null,
-    name: input.name,
-    stage: input.stage ?? null,
-    currency: input.currency ?? null,
-    kpis: input.kpis ?? null,
-  };
-}
-
-export async function createProject(input: ProjectInput): Promise<{data: any|null; error?: string|null}> {
+export async function createProject(input: string | ProjectInput): Promise<{data: any|null; error?: string|null}> {
   try {
     const row = buildProject(input);
     store.projects.push(row);
@@ -90,9 +102,10 @@ export async function createConsultingRequest(
 }
 export const mockDs: DataSource = {
   async listProjects() { return [...store.projects]; },
-  async createProject(name: string) {
-    const p: Project = { id: genId("p"), name, created_at: new Date().toISOString() };
-    store.projects.push(p); persist(); return p;
+  async createProject(input: string | ProjectInput) {
+    const { data, error } = await createProject(input);
+    if (error) throw new Error(error);
+    return data;
   },
   async listTasks(projectId: UUID) { return store.tasks.filter(t => t.project_id === projectId); },
   async upsertTask(input) {
