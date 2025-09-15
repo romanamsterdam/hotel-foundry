@@ -28,6 +28,16 @@ export const saveProject = async (input: ProjectInput) => {
     throw e;
   }
 };
+
+// ---- Debug hook (prod-safe when flagged) ----
+if (import.meta.env.VITE_DEBUG_DS === "true") {
+  // @ts-ignore
+  (window as any).HF = {
+    saveProject,
+    // optional: expose createProject, getDs for deeper poking
+  };
+  console.info("[HF] Debug hooks enabled: window.HF.saveProject()");
+}
 export const listMyProjects = async () => {
   if (impl?.listMyProjects) return impl.listMyProjects();
   if (impl?.listProjects) {
