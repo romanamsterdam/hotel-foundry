@@ -37,6 +37,7 @@ import ChartsKPIsPage from '../pages/ChartsKPIsPage';
 import StaffingSenseCheckPage from '../pages/StaffingSenseCheckPage';
 import UnderwritingSummaryPage from '../pages/UnderwritingSummaryPage';
 import IntroductionPage from './IntroductionPage';
+import { lastSavedLabel } from '../lib/utils';
 
 export default function DealWorkspace() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +48,7 @@ export default function DealWorkspace() {
   const [kpiUpdateKey, setKpiUpdateKey] = useState<number>(0);
   const [showPhotoLightbox, setShowPhotoLightbox] = useState<boolean>(false);
   const [projectId, setProjectId] = useState<string | undefined>(id);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -62,6 +64,7 @@ export default function DealWorkspace() {
 
     setDeal(foundDeal);
     setProjectId(id);
+    setLastSaved(foundDeal.updatedAt);
   }, [id, navigate, refreshToken]);
 
   // Build payload for Supabase saves
@@ -115,6 +118,10 @@ export default function DealWorkspace() {
       setProjectId(row.id);
       // Optionally update URL to reflect new ID
       // navigate(`/underwriting/${row.id}`, { replace: true });
+    }
+    // Update last saved timestamp for immediate UI feedback
+    if (row?.updated_at) {
+      setLastSaved(row.updated_at);
     }
   };
   const handleDelete = () => {
@@ -195,7 +202,7 @@ export default function DealWorkspace() {
               <span>•</span>
               <span>Created: {formatDate(deal.createdAt)}</span>
               <span>•</span>
-              <span>Last saved: {formatRelativeTime(deal.updatedAt)}</span>
+              <span>Last saved: {lastSavedLabel(lastSaved || deal.updatedAt)}</span>
             </div>
           </div>
         </div>

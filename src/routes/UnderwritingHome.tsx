@@ -12,6 +12,7 @@ import { totalRooms } from '../lib/rooms';
 import { eur0, dateShort } from '../lib/format';
 import { formatDate, formatRelativeTime } from '../lib/utils';
 import SafeImage from '../components/SafeImage';
+import { lastSavedLabel } from '../lib/utils';
 
 export default function UnderwritingHome() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -96,7 +97,7 @@ export default function UnderwritingHome() {
                 <div className="space-y-3">
                   <div className="text-xs text-slate-500 space-y-1">
                     <div>Created: {formatDate(deal.createdAt)}</div>
-                    <div>Last saved: {formatRelativeTime(deal.updatedAt)}</div>
+                    <div>Last saved: {lastSavedLabel(deal.updatedAt)}</div>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-600">Rooms:</span>

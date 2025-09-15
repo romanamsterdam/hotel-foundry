@@ -5,6 +5,8 @@ export type Project = {
   name: string;
   owner?: string | null;
   created_at?: string;
+  updated_at?: string;
+  last_edited_by?: string | null;
 };
 
 // Minimal input used by underwriting save.
