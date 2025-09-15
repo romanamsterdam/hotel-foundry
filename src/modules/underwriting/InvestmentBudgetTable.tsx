@@ -395,6 +395,10 @@ export default function InvestmentBudgetTable({ dealId, onSaved }: InvestmentBud
     setSaveState('saving');
     
     try {
+      // Save to Supabase first
+      await persistToBackend("Investment Budget");
+      
+      // Then update local storage
       const updatedDeal: Deal = {
         ...deal,
         purchasePrice: budget.netPurchasePrice, // Sync master purchase price

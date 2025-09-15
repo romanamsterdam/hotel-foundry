@@ -150,6 +150,10 @@ export default function OperatingExpenses({ dealId, onSaved }: OperatingExpenses
     setSaveState('saving');
     
     try {
+      // Save to Supabase first
+      await persistToBackend("Operating Expenses");
+      
+      // Then update local storage
       const updatedDeal: Deal = {
         ...deal,
         operatingExpenses: opexState,

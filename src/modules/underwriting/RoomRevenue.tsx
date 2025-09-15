@@ -215,6 +215,10 @@ export default function RoomRevenue({ dealId, onSaved }: RoomRevenueProps) {
     setSaveState('saving');
     
     try {
+      // Save to Supabase first
+      await persistToBackend("Room Revenue");
+      
+      // Then update local storage
       const updatedDeal: Deal = {
         ...deal,
         roomRevenue: model,

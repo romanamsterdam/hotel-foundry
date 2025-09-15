@@ -124,66 +124,67 @@ export default function PropertyDetailsForm({ dealId, onSaved }: PropertyDetails
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!deal || !validateForm() || saveState === 'saving') return;
 
     setSaveState('saving');
     setSaveError('');
     setShowSuccessMessage(false);
 
-    const updatedDeal: Deal = {
-      ...deal,
-      name: name.trim(),
-      location: location.trim(),
-      address: address.trim(),
-      propertyType: propertyType as Deal['propertyType'],
-      stars: stars as Deal['stars'],
-      gfaSqm,
-      purchasePrice,
-      currency,
-      photoUrl: photoUrl.trim() || undefined,
-      // Update budget net purchase price if budget exists
-      budget: deal.budget ? {
-        ...deal.budget,
-        netPurchasePrice: purchasePrice
-      } : undefined,
-    };
+    try {
+      // Save to Supabase first
+      await persistToBackend("Property Details");
+      
+      // Then update local storage for immediate UI updates
+      const updatedDeal: Deal = {
+        ...deal,
+        name: name.trim(),
+        location: location.trim(),
+        address: address.trim(),
+        propertyType: propertyType as Deal['propertyType'],
+        stars: stars as Deal['stars'],
+        gfaSqm,
+        purchasePrice,
+        currency,
+        photoUrl: photoUrl.trim() || undefined,
+        // Update budget net purchase price if budget exists
+        budget: deal.budget ? {
+          ...deal.budget,
+          netPurchasePrice: purchasePrice
+        } : undefined,
+      };
 
-    // Save to local storage immediately
-    upsertDeal(updatedDeal);
-    setCompleted(dealId, "propertyDetails", true);
+      // Save to local storage immediately
+      upsertDeal(updatedDeal);
+      setCompleted(dealId, "propertyDetails", true);
 
-    // Simulate database save
-    saveToSupabase(updatedDeal)
-      .then(() => {
-        setSaveState('success');
-        setShowSuccessMessage(true);
-        
-        // Trigger KPI recalculation
-        if (onSaved) {
-          onSaved();
-        }
+      setSaveState('success');
+      setShowSuccessMessage(true);
+      
+      // Trigger KPI recalculation
+      if (onSaved) {
+        onSaved();
+      }
 
-        // Revert to default state after 2 seconds
-        setTimeout(() => {
-          setSaveState('idle');
-        }, 2000);
+      // Revert to default state after 2 seconds
+      setTimeout(() => {
+        setSaveState('idle');
+      }, 2000);
 
-        // Hide success message after 3 seconds
-        setTimeout(() => {
-          setShowSuccessMessage(false);
-        }, 3000);
-      })
-      .catch((error) => {
-        setSaveState('error');
-        setSaveError(error.message || 'Failed to save changes');
-        
-        // Revert to default state after 3 seconds
-        setTimeout(() => {
-          setSaveState('idle');
-          setSaveError('');
-        }, 3000);
-      });
+      // Hide success message after 3 seconds
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 3000);
+    } catch (error: any) {
+      setSaveState('error');
+      setSaveError(error.message || 'Failed to save changes');
+      
+      // Revert to default state after 3 seconds
+      setTimeout(() => {
+        setSaveState('idle');
+        setSaveError('');
+      }, 3000);
+    }
   };
 
   const handleCancel = () => {

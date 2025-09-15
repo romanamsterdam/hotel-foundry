@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { useToast } from '../components/ui/toast';
 import { newId, upsertDeal } from '../lib/dealStore';
+import { saveProject } from '../lib/datasource';
 import { Deal } from '../types/deal';
 import { PropertyCore, SampleProperty } from '../types/property';
 import { formatCurrency } from '../lib/utils';
@@ -229,7 +230,29 @@ export default function CreateDealPage() {
     setIsCreating(true);
 
     try {
-      const dealId = newId();
+      // Build initial KPIs from template/form
+      const initialKpis = {
+        rooms: selectedRooms || 0,
+        location: selectedLocation || 'Location TBD',
+        propertyType: form.selectedTemplate?.propertyType || 'Boutique',
+        starRating: form.selectedTemplate?.starRating || 4,
+        currency: form.selectedTemplate?.currency || 'EUR',
+        gfaSqm: form.selectedTemplate?.gfaSqm || 0,
+        purchasePrice: form.selectedTemplate?.purchasePrice || 0,
+        facilities: form.selectedTemplate?.facilities || [],
+        roomTypes: form.selectedTemplate?.roomBreakdown || []
+      };
+
+      // Create in Supabase first
+      const savedProject = await saveProject({
+        name: form.dealName.trim(),
+        property_id: form.selectedTemplate?.id || null,
+        stage: "analysis",
+        currency: form.selectedTemplate?.currency || "EUR",
+        kpis: initialKpis,
+      });
+
+      const dealId = savedProject.id;
       const now = new Date().toISOString();
 
       // Convert PropertyCore roomTypes to Deal roomTypes format
