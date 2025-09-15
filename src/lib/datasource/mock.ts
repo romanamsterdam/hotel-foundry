@@ -1,80 +1,5 @@
-import { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
+import type { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
 import type { ProjectInput } from "../../types/projects";
-import type { ProjectInput } from "../../types/projects";
-
-// helper to normalize input into a payload the DB accepts
-const normalizeProjectInput = (input: string | ProjectInput) => {
-  if (typeof input === "string") {
-    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
-  }
-  return {
-    property_id: input.property_id ?? null,
-    name: input.name,
-    stage: input.stage ?? null,
-    currency: input.currency ?? null,
-    kpis: input.kpis ?? null,
-  };
-};
-
-function buildProject(input: string | ProjectInput) {
-  const p = normalizeProjectInput(input);
-  return {
-    id: genId("p"),
-    created_at: new Date().toISOString(),
-    owner_id: "mock-user",
-    ...p,
-  };
-}
-import type { ProjectInput } from "../../types/projects";
-
-// helper to normalize input into a payload the DB accepts
-const normalizeProjectInput = (input: string | ProjectInput) => {
-  if (typeof input === "string") {
-    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
-  }
-  return {
-    property_id: input.property_id ?? null,
-    name: input.name,
-    stage: input.stage ?? null,
-    currency: input.currency ?? null,
-    kpis: input.kpis ?? null,
-  };
-};
-
-function buildProject(input: string | ProjectInput) {
-  const p = normalizeProjectInput(input);
-  return {
-    id: genId("p"),
-    created_at: new Date().toISOString(),
-    owner_id: "mock-user",
-    ...p,
-  };
-}
-import type { ProjectInput } from "../../types/projects";
-
-// helper to normalize input into a payload the DB accepts
-const normalizeProjectInput = (input: string | ProjectInput) => {
-  if (typeof input === "string") {
-    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
-  }
-  return {
-    property_id: input.property_id ?? null,
-    name: input.name,
-    stage: input.stage ?? null,
-    currency: input.currency ?? null,
-    kpis: input.kpis ?? null,
-  };
-};
-
-function buildProject(input: string | ProjectInput) {
-  const p = normalizeProjectInput(input);
-  return {
-    id: genId("p"),
-    created_at: new Date().toISOString(),
-    owner_id: "mock-user",
-    ...p,
-  };
-}
 
 const LS_KEY = "hf-mock";
 type Store = { projects: Project[]; tasks: RoadmapTask[]; consulting: ConsultingRequest[]; };
@@ -103,67 +28,28 @@ let store: Store = init;
 const persist = () => localStorage.setItem(LS_KEY, JSON.stringify(store));
 const genId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
-export async function createProject(input: string | ProjectInput): Promise<{data: any|null; error?: string|null}> {
-  try {
-    const row = buildProject(input);
-    store.projects.push(row);
-    persist();
-    return { data: row, error: null };
-  } catch (e: any) {
-    console.error("[createProject][mock] failed:", e);
-    return { data: null, error: e?.message ?? "Unknown error" };
+// ---- helpers ----
+const normalizeProjectInput = (input: string | ProjectInput) => {
+  if (typeof input === "string") {
+    return { property_id: null, name: input, stage: null, currency: null, kpis: null };
   }
-}
+  return {
+    property_id: input.property_id ?? null,
+    name: input.name,
+    stage: input.stage ?? null,
+    currency: input.currency ?? null,
+    kpis: input.kpis ?? null,
+  };
+};
 
-export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
-  try {
-    return { data: [...store.projects], error: null };
-  } catch (e: any) {
-    console.error("[listMyProjects][mock] failed:", e);
-    return { data: [], error: e?.message ?? "Unknown error" };
-  }
-}
-
-export async function createProject(input: string | ProjectInput): Promise<{data: any|null; error?: string|null}> {
-  try {
-    const row = buildProject(input);
-    store.projects.push(row);
-    persist();
-    return { data: row, error: null };
-  } catch (e: any) {
-    console.error("[createProject][mock] failed:", e);
-    return { data: null, error: e?.message ?? "Unknown error" };
-  }
-}
-
-export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
-  try {
-    return { data: [...store.projects], error: null };
-  } catch (e: any) {
-    console.error("[listMyProjects][mock] failed:", e);
-    return { data: [], error: e?.message ?? "Unknown error" };
-  }
-}
-
-export async function createProject(input: string | ProjectInput): Promise<{data: any|null; error?: string|null}> {
-  try {
-    const row = buildProject(input);
-    store.projects.push(row);
-    persist();
-    return { data: row, error: null };
-  } catch (e: any) {
-    console.error("[createProject][mock] failed:", e);
-    return { data: null, error: e?.message ?? "Unknown error" };
-  }
-}
-
-export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
-  try {
-    return { data: [...store.projects], error: null };
-  } catch (e: any) {
-    console.error("[listMyProjects][mock] failed:", e);
-    return { data: [], error: e?.message ?? "Unknown error" };
-  }
+function buildProject(input: string | ProjectInput) {
+  const p = normalizeProjectInput(input);
+  return {
+    id: genId("p"),
+    created_at: new Date().toISOString(),
+    owner_id: "mock-user",
+    ...p,
+  };
 }
 
 function buildConsultingRequest(input: any): ConsultingRequest {
@@ -179,6 +65,49 @@ function buildConsultingRequest(input: any): ConsultingRequest {
   return req;
 }
 
+// ---- single source of truth: mockDs object (NO extra top-level exports) ----
+export const mockDs: DataSource = {
+  async listProjects() {
+    return [...store.projects];
+  },
+
+  // unified signature: string | ProjectInput -> Project
+  async createProject(input: string | ProjectInput) {
+    const row = buildProject(input);
+    store.projects.push(row);
+    persist();
+    return row as Project;
+  },
+
+  async listTasks(projectId: UUID) {
+    return store.tasks.filter(t => t.project_id === projectId);
+  },
+
+  async upsertTask(input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }) {
+    let t = store.tasks.find(x => x.id === input.id);
+    if (!t) {
+      t = { id: genId("t"), project_id: input.project_id!, title: input.title, status: "not_started" } as RoadmapTask;
+      store.tasks.push(t);
+    }
+    Object.assign(t, input);
+    persist();
+    return t!;
+  },
+
+  async listConsulting() {
+    return [...store.consulting];
+  },
+
+  async updateConsulting(id: UUID, patch: Partial<ConsultingRequest>) {
+    const c = store.consulting.find(x => x.id === id);
+    if (!c) throw new Error("Not found");
+    Object.assign(c, patch);
+    persist();
+    return c;
+  },
+};
+
+// Export consulting helper for backward compatibility
 export async function createConsultingRequest(
   input: any
 ): Promise<{ data: ConsultingRequest | null; error?: string | null }> {
@@ -192,23 +121,3 @@ export async function createConsultingRequest(
     return { data: null, error: e?.message ?? "Unknown error" };
   }
 }
-export const mockDs: DataSource = {
-  async listProjects() { return [...store.projects]; },
-  async createProject(input: string | ProjectInput): Promise<Project> {
-    const { data, error } = await createProject(input);
-    if (error) throw new Error(error);
-    return data as Project;
-  },
-  async listTasks(projectId: UUID) { return store.tasks.filter(t => t.project_id === projectId); },
-  async upsertTask(input) {
-    let t = store.tasks.find(x => x.id === input.id);
-    if (!t) { t = { id: genId("t"), project_id: input.project_id, title: input.title, status: "not_started" } as RoadmapTask; store.tasks.push(t); }
-    Object.assign(t, input); persist(); return t!;
-  },
-  async listConsulting() { return [...store.consulting]; },
-  async updateConsulting(id, patch) {
-    const c = store.consulting.find(x => x.id === id);
-    if (!c) throw new Error("Not found");
-    Object.assign(c, patch); persist(); return c;
-  },
-};
