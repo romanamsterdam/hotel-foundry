@@ -8,6 +8,21 @@ let impl: DataSource;
 export const setDs = (ds: DataSource) => { impl = ds; };
 export const getDs = (): DataSource => impl as DataSource;
 
+// Re-export project functions for UI
+export const createProject = (input: any) => {
+  if (impl?.createProject) {
+    return impl.createProject(input);
+  }
+  throw new Error("DataSource not initialized");
+};
+
+export const listMyProjects = () => {
+  if (impl?.listMyProjects) {
+    return impl.listMyProjects();
+  }
+  throw new Error("DataSource not initialized");
+};
+
 export const initDataSource = async () => {
   console.log("[datasource] selecting:", env.DATA_SOURCE);
   if (env.DATA_SOURCE === "supabase") {

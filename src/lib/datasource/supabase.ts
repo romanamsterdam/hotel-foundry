@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabaseClient";
+import type { ProjectInput } from "../../types/projects";
 
 function coerceConsulting(input: any) {
   const raw = input.estimated_hours;
@@ -15,27 +16,40 @@ function coerceConsulting(input: any) {
   };
 }
 
-export async function createConsultingRequest(
-  input: any
-): Promise<{ data: ConsultingRequest | null; error?: string | null }> {
-  try {
-    const payload = coerceConsulting(input);
-    
-    const { data, error } = await supabase!
-      .from("consulting_requests")
-      .insert(payload)
-      .select()
-      .single();
+export async function createProject(input: ProjectInput): Promise<{data: any|null; error?: string|null}> {
+  const payload = {
+    property_id: input.property_id ?? null,
+    name: input.name,
+    stage: input.stage ?? null,
+    currency: input.currency ?? null,
+    kpis: input.kpis ?? null,
+    // owner_id intentionally omitted; DB trigger sets it
+  };
 
-    if (error) {
-      console.error("[supabase createConsultingRequest] error:", error);
-      return { data: null, error: error.message };
-    }
-    return { data: data as ConsultingRequest, error: null };
-  } catch (e: any) {
-    console.error("[supabase createConsultingRequest] threw:", e);
-    return { data: null, error: e?.message ?? "Unexpected error" };
+  const { data, error } = await supabase
+    .from("projects")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[createProject] supabase error:", error, { payload });
+    return { data: null, error: error.message };
   }
+  return { data, error: null };
+}
+
+export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("created_at", { ascending: false });
+  
+  if (error) {
+    console.error("[listMyProjects] supabase error:", error);
+    return { data: [], error: error.message };
+  }
+  return { data, error: null };
 }
 
 export const supabaseDs: DataSource = {

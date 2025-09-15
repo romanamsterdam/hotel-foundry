@@ -1,4 +1,5 @@
 import { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
+import type { ProjectInput } from "../../types/projects";
 
 const LS_KEY = "hf-mock";
 type Store = { projects: Project[]; tasks: RoadmapTask[]; consulting: ConsultingRequest[]; };
@@ -26,6 +27,40 @@ const init: Store = load() ?? {
 let store: Store = init;
 const persist = () => localStorage.setItem(LS_KEY, JSON.stringify(store));
 const genId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+
+function buildProject(input: ProjectInput) {
+  return {
+    id: genId("p"),
+    created_at: new Date().toISOString(),
+    owner_id: "mock-user",
+    property_id: input.property_id ?? null,
+    name: input.name,
+    stage: input.stage ?? null,
+    currency: input.currency ?? null,
+    kpis: input.kpis ?? null,
+  };
+}
+
+export async function createProject(input: ProjectInput): Promise<{data: any|null; error?: string|null}> {
+  try {
+    const row = buildProject(input);
+    store.projects.push(row);
+    persist();
+    return { data: row, error: null };
+  } catch (e: any) {
+    console.error("[createProject][mock] failed:", e);
+    return { data: null, error: e?.message ?? "Unknown error" };
+  }
+}
+
+export async function listMyProjects(): Promise<{data: any[]; error?: string|null}> {
+  try {
+    return { data: [...store.projects], error: null };
+  } catch (e: any) {
+    console.error("[listMyProjects][mock] failed:", e);
+    return { data: [], error: e?.message ?? "Unknown error" };
+  }
+}
 
 function buildConsultingRequest(input: any): ConsultingRequest {
   const req: ConsultingRequest = {
