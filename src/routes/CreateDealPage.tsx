@@ -20,6 +20,10 @@ import { currentUser } from '../lib/user';
 import TemplateCard from '../components/templates/TemplateCard';
 import { getInitials, asStr, safeLocation } from '../lib/strings';
 
+// simple uuid check (v4-ish; fine for basic guard)
+const isUuid = (v?: string | null) =>
+  !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
 interface CreateDealFormState {
   property: PropertyCore;
   dealName: string;
@@ -243,10 +247,17 @@ export default function CreateDealPage() {
         roomTypes: form.selectedTemplate?.roomBreakdown || []
       };
 
+      // This comes from your template picker.
+      // It might be a literal like "template-1" or an object.
+      const candidatePropertyId = form.selectedTemplate?.property_id ?? form.selectedTemplate?.id ?? null;
+
+      // Only keep it if it's a real UUID, else null
+      const property_id = isUuid(candidatePropertyId) ? candidatePropertyId : null;
+
       // Create in Supabase first
       const savedProject = await saveProject({
         name: form.dealName.trim(),
-        property_id: form.selectedTemplate?.id || null,
+        property_id, // <- UUID or null
         stage: "analysis",
         currency: form.selectedTemplate?.currency || "EUR",
         kpis: initialKpis,

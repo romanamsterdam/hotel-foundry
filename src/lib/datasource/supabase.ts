@@ -1,13 +1,16 @@
 import { supabase } from "../../lib/supabaseClient";
 import type { DataSource, Project, ProjectInput, RoadmapTask, ConsultingRequest, UUID } from "./types";
 
+const isUuid = (v?: string | null) =>
+  !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
 // ---- helpers (single copy) ----
 const normalizeProjectInput = (input: string | ProjectInput) => {
   if (typeof input === "string") {
     return { property_id: null, name: input, stage: null, currency: null, kpis: null };
   }
   return {
-    property_id: input.property_id ?? null,
+    property_id: isUuid(input.property_id) ? input.property_id! : null,
     name: input.name,
     stage: input.stage ?? null,
     currency: input.currency ?? null,
