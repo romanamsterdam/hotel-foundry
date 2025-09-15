@@ -79,6 +79,24 @@ export const mockDs: DataSource = {
     return row as Project;
   },
 
+  // Single entry point for Underwriting Save
+  async saveProject(input: ProjectInput) {
+    if (input.id) {
+      // Update existing
+      const i = store.projects.findIndex(p => p.id === input.id);
+      if (i === -1) throw new Error("Project not found");
+      const updated = { ...store.projects[i], ...normalizeProjectInput(input) };
+      store.projects[i] = updated;
+      persist();
+      return updated as Project;
+    }
+    // Create new
+    const row = buildProject(input);
+    store.projects.push(row);
+    persist();
+    return row as Project;
+  },
+
   async listTasks(projectId: UUID) {
     return store.tasks.filter(t => t.project_id === projectId);
   },

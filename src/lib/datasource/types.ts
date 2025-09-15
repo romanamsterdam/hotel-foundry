@@ -7,6 +7,16 @@ export type Project = {
   created_at?: string;
 };
 
+// Minimal input used by underwriting save.
+export type ProjectInput = {
+  id?: UUID;                 // present when updating
+  property_id?: UUID | null;
+  name: string;
+  stage?: string | null;     // or your enum
+  currency?: string | null;
+  kpis?: Record<string, any> | null; // JSONB of KPIs
+};
+
 export type TaskStatus = "not_started" | "in_progress" | "done" | "stuck";
 
 export type RoadmapTask = {
@@ -39,7 +49,10 @@ export type ConsultingRequest = {
 
 export interface DataSource {
   listProjects(): Promise<Project[]>;
-  createProject(name: string): Promise<Project>;
+  // Create-only helper (still supported)
+  createProject(input: string | ProjectInput): Promise<Project>;
+  // New: single entrypoint used by Underwriting Save.
+  saveProject(input: ProjectInput): Promise<Project>;
   listTasks(projectId: UUID): Promise<RoadmapTask[]>;
   upsertTask(input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }): Promise<RoadmapTask>;
   listConsulting(): Promise<ConsultingRequest[]>;

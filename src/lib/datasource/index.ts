@@ -16,6 +16,18 @@ export const createProject = async (input: string | ProjectInput) => {
   return impl.createProject(input);
 };
 
+export const saveProject = async (input: ProjectInput) => {
+  if (!impl?.saveProject) throw new Error("DataSource not initialized");
+  try {
+    console.info("[saveProject] input →", input);
+    const row = await impl.saveProject(input);
+    console.info("[saveProject] saved ←", row);
+    return row;
+  } catch (e: any) {
+    console.error("[saveProject] FAILED:", e?.message ?? e);
+    throw e;
+  }
+};
 export const listMyProjects = async () => {
   if (impl?.listMyProjects) return impl.listMyProjects();
   if (impl?.listProjects) {
