@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       }
 
       // Ensure profile exists
-      await supabase.rpc("ensure_profile").catch(() => {});
+      await safeEnsureProfile();
       
       const prof = await fetchProfile(base.id);
       const merged: AuthUser = {
@@ -124,10 +124,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           return;
         }
         setLoading(true);
-        // Ensure profile exists
         await safeEnsureProfile();
-        // Ensure profile exists
-        await supabase.rpc("ensure_profile").catch(() => {});
         const prof = await fetchProfile(base.id);
         setUser({
           ...base,

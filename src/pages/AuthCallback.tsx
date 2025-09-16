@@ -1,6 +1,5 @@
 import * as React from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../auth/useAuth";
 
 function parseHash() {
   // Extract tokens from URL hash (#access_token=...&refresh_token=...)
@@ -12,13 +11,22 @@ function parseHash() {
 }
 
 export default function AuthCallback() {
-  const { setUser } = useAuth();
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     (async () => {
       try {
         if (!supabase) throw new Error("Supabase client not configured");
+
+        // If we already have a session (refresh or re-click), just go.
+        const current = await supabase.auth.getSession();
+        if (current.data?.session) {
+          const to = sessionStorage.getItem("postAuthRedirect") || "/";
+          sessionStorage.removeItem("postAuthRedirect");
+          window.history.replaceState({}, "", to);
+          window.location.assign(to);
+          return;
+        }
 
         // 1) Handle OTP magic link case (tokens in hash)
         const { access_token, refresh_token } = parseHash();
@@ -47,6 +55,9 @@ export default function AuthCallback() {
             } catch (e) {
               console.warn("[ensure_profile] threw:", e);
             }
+          } else {
+            // No tokens, no code, no session -> nothing to do
+            throw new Error("No auth tokens found in callback URL.");
           }
         }
 
@@ -61,7 +72,7 @@ export default function AuthCallback() {
         setError(e?.message ?? "Sign in failed.");
       }
     })();
-  }, [setUser]);
+  }, []);
 
   return (
     <div className="min-h-[40vh] flex items-center justify-center">
