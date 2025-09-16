@@ -9,7 +9,7 @@ import AccountMenu from "../components/layout/AccountMenu";
 export default function LoggedInLayout({ title, children }: PropsWithChildren<{ title?: string }>) {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  const isAdmin = user?.email === 'admin@hotelfoundry.com'; // Simple admin check for now
+  const isAdmin = user?.role === 'admin';
 
   // Determine page title based on pathname
   const getPageTitle = () => {

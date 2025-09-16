@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { useAuth } from "../../auth/useAuth";
 import AccountSheet from "../account/AccountSheet";
+import { Badge } from "../ui/badge";
 
 function initialsFrom(name?: string, email?: string) {
   const base = (name || email || "").trim();
@@ -18,12 +19,12 @@ function initialsFrom(name?: string, email?: string) {
 
 export default function AccountMenu() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const [openSheet, setOpenSheet] = React.useState(false);
   const [imgError, setImgError] = React.useState(false);
   
   // Guard for logged-out state
-  if (!user) {
+  if (loading || !user) {
     return null;
   }
 
@@ -73,6 +74,16 @@ export default function AccountMenu() {
           <DropdownMenuLabel>
             Signed in as
             <div className="truncate text-xs text-muted-foreground">{name || email || "User"}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="secondary" className="text-xs">
+                {user.role || 'user'}
+              </Badge>
+              {user.subscription && (
+                <Badge variant="outline" className="text-xs">
+                  {user.subscription}
+                </Badge>
+              )}
+            </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setOpenSheet(true)} className="cursor-pointer">

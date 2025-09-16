@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
 import { env } from "../config/env";
+import type { AuthUser } from "../types/auth";
 import {
   AuthProvider as MockProvider,
   useAuth as useMockAuth,
-  type AuthUser,
 } from "./MockAuthProvider";
 import {
   AuthProvider as SupabaseProvider,

@@ -1,15 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-
-export type AuthUser = {
-  id: string;
-  email?: string;
-  name?: string;
-  avatarUrl?: string;
-  tier?: string; // Free | Starter | Pro (mock)
-};
+import type { AuthUser } from "../types/auth";
 
 type AuthContextValue = {
   user: AuthUser | null;
+  loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   signIn: (opts?: { email?: string; tier?: string }) => Promise<void> | void;
   signOut: () => Promise<void> | void;
@@ -21,6 +15,7 @@ const LS_TIER = "tier";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // load from localStorage on mount
   useEffect(() => {
@@ -29,7 +24,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (raw) {
         const parsed: AuthUser = JSON.parse(raw);
         // ensure tier fallback
-        parsed.tier = parsed.tier ?? localStorage.getItem(LS_TIER) ?? "Free";
+        parsed.subscription = (parsed as any).tier ?? localStorage.getItem(LS_TIER) ?? "free";
+        parsed.role = "user"; // Mock users are regular users by default
         setUser(parsed);
       }
     } catch {}
@@ -51,7 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: opts?.email ?? "guest@example.com",
       name: "Guest",
       avatarUrl: "",
-      tier,
+      role: "user",
+      subscription: tier.toLowerCase() as AuthUser['subscription'],
     };
     setUser(mockUser);
   };
@@ -62,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, setUser, signIn, signOut }),
-    [user]
+    () => ({ user, loading, setUser, signIn, signOut }),
+    [user, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,6 +1,21 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { AuthUser } from "../types/auth";
+
+// Keep the same external shape as your MockAuthProvider user for app-wide compatibility
+export type AuthUser = {
+  id: string;
+  email?: string;
+  name?: string;
+  avatarUrl?: string;
+  role?: "user" | "admin";
+  subscription?: "free" | "starter" | "pro" | "beta";
+};
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -12,7 +27,6 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Helper: map SB session user -> base AuthUser (without profile fields)
 function mapBaseUser(sbUser: any | null): AuthUser | null {
   if (!sbUser) return null;
   return {
@@ -23,7 +37,6 @@ function mapBaseUser(sbUser: any | null): AuthUser | null {
   };
 }
 
-// Fetch profiles row for current user
 async function fetchProfile(userId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
@@ -35,26 +48,34 @@ async function fetchProfile(userId: string) {
     console.warn("[Auth] profiles fetch error:", error);
     return null;
   }
-  return data as { role: string; subscription: string; email?: string | null } | null;
+  return data as {
+    role?: "user" | "admin" | null;
+    subscription?: "free" | "starter" | "pro" | "beta" | null;
+    email?: string | null;
+  } | null;
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Initial session + profile load
+  // Bootstrap on mount
   useEffect(() => {
     let mounted = true;
 
     async function init() {
+      // If Supabase client is not configured (missing envs), don't hang the UI
       if (!supabase) {
-        setUser(null);
-        setLoading(false);
+        console.warn("[Auth] Supabase client missing; rendering logged-out state.");
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      const base = mapBaseUser(session?.user ?? null);
+      const { data: sessionRes } = await supabase.auth.getSession();
+      const base = mapBaseUser(sessionRes?.session?.user ?? null);
 
       if (!base) {
         if (mounted) {
@@ -67,8 +88,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       const prof = await fetchProfile(base.id);
       const merged: AuthUser = {
         ...base,
-        role: prof?.role as AuthUser['role'],
-        subscription: prof?.subscription as AuthUser['subscription'],
+        role: prof?.role ?? undefined,
+        subscription: prof?.subscription ?? undefined,
       };
 
       if (mounted) {
@@ -79,23 +100,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
     init();
 
-    // Subscribe to auth state changes: refresh profile on sign-in/out
-    const { data: sub } = supabase?.auth.onAuthStateChange(async (_e, session) => {
-      const base = mapBaseUser(session?.user ?? null);
-      if (!base) {
-        setUser(null);
+    // Subscribe to auth changes
+    const { data: sub } =
+      supabase?.auth.onAuthStateChange(async (_event, session) => {
+        const base = mapBaseUser(session?.user ?? null);
+        if (!base) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
+        const prof = await fetchProfile(base.id);
+        setUser({
+          ...base,
+          role: prof?.role ?? undefined,
+          subscription: prof?.subscription ?? undefined,
+        });
         setLoading(false);
-        return;
-      }
-      setLoading(true);
-      const prof = await fetchProfile(base.id);
-      setUser({
-        ...base,
-        role: prof?.role as AuthUser['role'],
-        subscription: prof?.subscription as AuthUser['subscription'],
-      });
-      setLoading(false);
-    }) ?? { data: undefined };
+      }) ?? { data: undefined };
 
     return () => {
       mounted = false;

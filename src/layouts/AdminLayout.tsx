@@ -4,7 +4,7 @@ import { Shield, Database, Users, FileText, Map, BarChart3 } from 'lucide-react'
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { useAuth } from '../auth/useAuth';
-import AccountMenu from '../modules/account/AccountMenu';
+import AccountMenu from '../components/layout/AccountMenu';
 
 const adminTabs = [
   {
