@@ -5,9 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { getDeal, upsertDeal } from '../../lib/dealStore';
 import { RoomType } from '../../types/deal';
-import { totalRooms } from '../../lib/rooms';
+import { totalRooms, getRoomsTotal, isRoomMixValid } from '../../lib/rooms';
 import { computeTotalRooms } from '../../lib/deals/normalizers';
 import { RoomTypeItem } from '../../lib/types/property';
+import { RoomMixSchema, RoomTypeSchema } from './schemas/roomMix';
+import type { RoomTypeParsed } from './schemas/roomMix';
 
 type Props = {
   dealId: string;
@@ -21,60 +23,49 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isValid, setIsValid] = useState(false);
 
-  // Load room types when modal opens
+  // Load room types when modal opens - safe fallbacks
   useEffect(() => {
-    if (isOpen) {
-      const deal = getDeal(dealId);
-      if (deal) {
-        // Use normalized rooms if available, fallback to legacy roomTypes  
-        if (Array.isArray(deal.normalizedRooms) && deal.normalizedRooms.length > 0) {
-          const normalizedRoomTypes = deal.normalizedRooms.map(r => ({
-            id: r.id || crypto.randomUUID(),
-            name: r.type,
-            rooms: r.count || 0,
-            adrWeight: 100 // Default weight
-          }));
-          setRoomTypes(normalizedRoomTypes);
-        } else if (Array.isArray(deal.rooms) && deal.rooms.length > 0) {
-          const normalizedRoomTypes = deal.rooms.map(r => ({
-            id: r.id || crypto.randomUUID(),
-            name: r.type,
-            rooms: r.count || 0,
-            adrWeight: 100 // Default weight
-          }));
-          setRoomTypes(normalizedRoomTypes);
-        } else {
-          setRoomTypes([...deal.roomTypes]);
-        }
-      }
-    }
+    if (!isOpen) return;
+    const deal = getDeal(dealId);
+    const legacy = Array.isArray(deal?.roomTypes) ? deal!.roomTypes : [];
+    const normalized = Array.isArray(deal?.normalizedRooms) ? deal!.normalizedRooms : [];
+    const seed = (normalized.length ? normalized.map(r => ({
+      id: r.id || crypto.randomUUID(),
+      name: r.name ?? String(r.type ?? ""),
+      rooms: Number(r.count) || 0,
+      adrWeight: Number((r as any).adrWeight) || 100,
+    })) : legacy.map(rt => ({
+      id: rt.id || crypto.randomUUID(),
+      name: rt.name ?? "",
+      rooms: Number(rt.rooms) || 0,
+      adrWeight: Number(rt.adrWeight) || 100,
+    })));
+
+    setErrors({});
+    setRoomTypes(seed);
   }, [dealId, isOpen]);
 
-  // Validate form
+  // Re-validate whenever local list changes
   useEffect(() => {
-    const newErrors: Record<string, string> = {};
-    
-    // Check total rooms > 0
-    const total = roomTypes.reduce((sum, rt) => sum + rt.rooms, 0);
-    if (total === 0) {
-      newErrors.total = "Total rooms must be greater than 0";
+    try {
+      const parsed = RoomMixSchema.parse(roomTypes);
+      const errs: Record<string, string> = {};
+      // business rule: at least one room in total
+      const { ok } = isRoomMixValid(parsed);
+      setIsValid(ok);
+      setErrors(errs);
+    } catch (e: any) {
+      const errs: Record<string, string> = {};
+      if (Array.isArray(e?.issues)) {
+        for (const issue of e.issues) {
+          // path [index, field]
+          const [idx, field] = issue.path as [number, string];
+          errs[`${String(field)}-${idx}`] = issue.message;
+        }
+      }
+      setErrors(errs);
+      setIsValid(false);
     }
-
-    // Check individual room types
-    roomTypes.forEach((rt, index) => {
-      if (!rt.name.trim()) {
-        newErrors[`name-${index}`] = "Room type name is required";
-      }
-      if (rt.rooms < 0) {
-        newErrors[`rooms-${index}`] = "Number of rooms cannot be negative";
-      }
-      if (rt.adrWeight < 50 || rt.adrWeight > 250) {
-        newErrors[`weight-${index}`] = "ADR weight must be between 50-250";
-      }
-    });
-
-    setErrors(newErrors);
-    setIsValid(Object.keys(newErrors).length === 0 && roomTypes.length > 0);
   }, [roomTypes]);
 
   const handleAddRoomType = () => {
@@ -97,46 +88,47 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
   };
 
   const handleRoomTypeChange = (index: number, field: keyof RoomType, value: string | number) => {
-    const updated = [...roomTypes];
-    updated[index] = { ...updated[index], [field]: value };
-    setRoomTypes(updated);
+    setRoomTypes(prev => {
+      const next = [...prev];
+      const row = { ...next[index] };
+      if (field === 'rooms' || field === 'adrWeight') {
+        row[field] = Number(value);
+      } else if (field === 'name') {
+        row.name = String(value);
+      }
+      next[index] = row;
+      return next;
+    });
   };
 
   const handleSave = () => {
     if (!isValid) return;
 
+    // Parse & normalize once more on save
+    const parsed = RoomMixSchema.parse(roomTypes);
+    const filtered = parsed.filter(rt => rt.name.trim() !== "");
     const deal = getDeal(dealId);
     if (!deal) return;
 
-    // Update both legacy roomTypes and new normalized rooms format
-    const filteredRoomTypes = roomTypes.filter(rt => rt.name.trim());
-    const normalizedRoomsLegacy = filteredRoomTypes.map(rt => ({
-      id: rt.id,
-      type: rt.name,
-      count: rt.rooms,
-      sqm: undefined,
-      adrBase: undefined
-    }));
-    
-    const normalizedRoomsNew: RoomTypeItem[] = filteredRoomTypes.map(rt => ({
-      id: rt.id,
-      name: rt.name,
-      count: rt.rooms,
-      sqm: undefined,
-      adrBase: undefined
-    }));
+    // Legacy shapes
+    const legacyRoomTypes = filtered.map(rt => ({ id: rt.id, name: rt.name, rooms: rt.rooms, adrWeight: rt.adrWeight }));
+    const legacyRooms = filtered.map(rt => ({ id: rt.id, type: rt.name, count: rt.rooms, sqm: undefined, adrBase: undefined }));
+
+    // New canonical shape
+    const normalizedRooms = filtered.map(rt => ({ id: rt.id, name: rt.name, count: rt.rooms, sqm: undefined, adrBase: undefined }));
 
     const updatedDeal = {
       ...deal,
-      roomTypes: filteredRoomTypes,
-      rooms: normalizedRoomsLegacy,
-      normalizedRooms: normalizedRoomsNew,
-      totalRooms: computeTotalRooms(normalizedRoomsNew),
-      updatedAt: new Date().toISOString()
+      roomTypes: legacyRoomTypes,
+      rooms: legacyRooms,
+      normalizedRooms,
+      totalRooms: getRoomsTotal(filtered),
+      updatedAt: new Date().toISOString(),
     };
 
     upsertDeal(updatedDeal);
-    onSaved();
+    onSaved?.();
+    onClose();
   };
 
   const handleCancel = () => {
@@ -145,6 +137,7 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
 
   // Empty state
   const showEmptyState = roomTypes.length === 0;
+  const totalRoomsCount = getRoomsTotal(roomTypes);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -194,7 +187,7 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
               {/* Room Type Rows */}
               {roomTypes.map((roomType, index) => (
                 <div key={roomType.id} className="space-y-3 md:space-y-0">
-                  {/* Mobile Labels */}
+                  {/* Mobile Layout */}
                   <div className="md:hidden space-y-3 p-4 border border-slate-200 rounded-lg">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -220,8 +213,8 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
                       </label>
                       <input
                         type="number"
-                        value={roomType.rooms || ''}
-                        onChange={(e) => handleRoomTypeChange(index, 'rooms', Number(e.target.value) || 0)}
+                        value={roomType.rooms ?? ''}
+                        onChange={(e) => handleRoomTypeChange(index, 'rooms', e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${
                           errors[`rooms-${index}`] ? 'border-red-500' : 'border-slate-300'
                         }`}
@@ -253,17 +246,17 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
                       </label>
                       <input
                         type="number"
-                        value={roomType.adrWeight || ''}
-                        onChange={(e) => handleRoomTypeChange(index, 'adrWeight', Number(e.target.value) || 100)}
+                        value={roomType.adrWeight ?? ''}
+                        onChange={(e) => handleRoomTypeChange(index, 'adrWeight', e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${
-                          errors[`weight-${index}`] ? 'border-red-500' : 'border-slate-300'
+                          errors[`adrWeight-${index}`] ? 'border-red-500' : 'border-slate-300'
                         }`}
                         placeholder="100"
                         min="50"
-                        max="250"
+                        max="300"
                       />
-                      {errors[`weight-${index}`] && (
-                        <p className="mt-1 text-sm text-red-600">{errors[`weight-${index}`]}</p>
+                      {errors[`adrWeight-${index}`] && (
+                        <p className="mt-1 text-sm text-red-600">{errors[`adrWeight-${index}`]}</p>
                       )}
                     </div>
 
@@ -302,8 +295,8 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
                     <div className="col-span-3">
                       <input
                         type="number"
-                        value={roomType.rooms || ''}
-                        onChange={(e) => handleRoomTypeChange(index, 'rooms', Number(e.target.value) || 0)}
+                        value={roomType.rooms ?? ''}
+                        onChange={(e) => handleRoomTypeChange(index, 'rooms', e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${
                           errors[`rooms-${index}`] ? 'border-red-500' : 'border-slate-300'
                         }`}
@@ -318,17 +311,17 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
                     <div className="col-span-4">
                       <input
                         type="number"
-                        value={roomType.adrWeight || ''}
-                        onChange={(e) => handleRoomTypeChange(index, 'adrWeight', Number(e.target.value) || 100)}
+                        value={roomType.adrWeight ?? ''}
+                        onChange={(e) => handleRoomTypeChange(index, 'adrWeight', e.target.value)}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 ${
-                          errors[`weight-${index}`] ? 'border-red-500' : 'border-slate-300'
+                          errors[`adrWeight-${index}`] ? 'border-red-500' : 'border-slate-300'
                         }`}
                         placeholder="100"
                         min="50"
-                        max="250"
+                        max="300"
                       />
-                      {errors[`weight-${index}`] && (
-                        <p className="mt-1 text-sm text-red-600">{errors[`weight-${index}`]}</p>
+                      {errors[`adrWeight-${index}`] && (
+                        <p className="mt-1 text-sm text-red-600">{errors[`adrWeight-${index}`]}</p>
                       )}
                     </div>
 
@@ -366,10 +359,10 @@ export default function RoomMixModal({ dealId, isOpen, onClose, onSaved }: Props
               <div className="border-t border-slate-200 pt-4 mt-6">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium text-slate-700">
-                    Total Rooms: <span className="text-lg font-semibold text-slate-900">{roomTypes.reduce((sum, rt) => sum + rt.rooms, 0)}</span>
+                    Total Rooms: <span className="text-lg font-semibold text-slate-900">{totalRoomsCount}</span>
                   </div>
-                  {errors.total && (
-                    <p className="text-sm text-red-600">{errors.total}</p>
+                  {!isValid && totalRoomsCount === 0 && (
+                    <p className="text-sm text-red-600">Total rooms must be greater than 0</p>
                   )}
                 </div>
               </div>

@@ -26,3 +26,16 @@ export function getTotalRooms(deal: any): number {
 export function adrByType(overallAdr: number, weightIndex: number) {
   return overallAdr * (weightIndex / 100);
 }
+
+// ADD below existing imports/exports
+export function getRoomsTotal(list: Array<{ rooms?: number }>): number {
+  return (list ?? []).reduce((s, r) => s + (Number(r?.rooms) || 0), 0);
+}
+
+export function isRoomMixValid(list: Array<{ name?: string; rooms?: number }>): { ok: boolean; total: number } {
+  if (!Array.isArray(list)) return { ok: false, total: 0 };
+  const total = getRoomsTotal(list);
+  const allRowsValid = list.every(r => (r?.name ?? "").toString().trim().length > 0 || (Number(r?.rooms) || 0) > 0);
+  const noNegatives = list.every(r => (Number(r?.rooms) || 0) >= 0);
+  return { ok: allRowsValid && noNegatives && total > 0, total };
+}
