@@ -165,11 +165,11 @@ export const supabaseDs: DataSource = {
     const payload = {
       name: input.name,
       email: input.email,
-      expertise: input.expertise,         // text[] in table (ok to pass array)
+      expertise: input.expertise,         // enum string matches expertise_type
       seniority: input.seniority,         // enum
       estimated_hours: input.estimatedHours ?? null,
       message: input.message,
-      status: "unread",                   // default status
+      status: "new",                      // default status
       assignee: null,
     };
 

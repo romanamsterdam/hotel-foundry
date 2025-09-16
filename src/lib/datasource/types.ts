@@ -10,7 +10,7 @@ export type ConsultingExpertise =
 export interface ConsultingRequestInput {
   name: string;
   email: string;
-  expertise: ConsultingExpertise[];
+  expertise: ConsultingExpertise;
   seniority: ConsultingSeniority;
   estimatedHours?: number | null;
   message: string;

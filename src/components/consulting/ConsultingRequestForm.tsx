@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../ui/toast";
 import { getDataSource } from "../../lib/datasource";
-import type { ConsultingRequestInput } from "../../lib/datasource/types";
+import type { ConsultingRequestInput, ConsultingExpertise } from "../../lib/datasource/types";
 
 // If you use shadcn/ui, uncomment these and remove the minimal elements below
 // import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import type { ConsultingRequestInput } from "../../lib/datasource/types";
 // import { Checkbox } from "@/components/ui/checkbox";
 
 type Seniority = "junior" | "standard" | "partner";
-type Expertise = "operations" | "finance" | "development" | "other";
 
 const HOURLY: Record<Seniority, number> = {
   junior: 80,
@@ -30,7 +29,7 @@ export default function ConsultingRequestForm() {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [expertise, setExpertise] = useState<Expertise>("operations");
+  const [expertise, setExpertise] = useState<ConsultingExpertise>("operations");
   const [hoursHint, setHoursHint] = useState<string>("");
   const [summary, setSummary] = useState("");
   const [seniority, setSeniority] = useState<Seniority>("standard");
@@ -64,7 +63,7 @@ export default function ConsultingRequestForm() {
       const payload: ConsultingRequestInput = {
         name,
         email,
-        expertise: [expertise], // Convert single selection to array
+        expertise, // Single string now
         seniority,
         estimatedHours: hoursHint ? Number(hoursHint) || null : null,
         message: summary,
@@ -164,7 +163,7 @@ export default function ConsultingRequestForm() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setExpertise(key as Expertise)}
+                  onClick={() => setExpertise(key as ConsultingExpertise)}
                   className={cn(
                     "rounded-xl border p-3 text-left transition",
                     expertise === key
