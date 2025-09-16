@@ -27,6 +27,17 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// Helper: safely call ensure_profile RPC
+async function safeEnsureProfile() {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.rpc("ensure_profile");
+    if (error) console.warn("[ensure_profile] error:", error);
+  } catch (e) {
+    console.warn("[ensure_profile] threw:", e);
+  }
+}
+
 function mapBaseUser(sbUser: any | null): AuthUser | null {
   if (!sbUser) return null;
   return {
@@ -113,6 +124,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           return;
         }
         setLoading(true);
+        // Ensure profile exists
+        await safeEnsureProfile();
         // Ensure profile exists
         await supabase.rpc("ensure_profile").catch(() => {});
         const prof = await fetchProfile(base.id);

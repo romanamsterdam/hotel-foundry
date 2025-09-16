@@ -28,15 +28,25 @@ export default function AuthCallback() {
             refresh_token,
           });
           if (error) throw error;
-          // Optional: call ensure_profile RPC (belt & suspenders)
-          await supabase.rpc("ensure_profile").catch(() => {});
+          // Ensure profile exists after session establishment
+          try {
+            const { error: ensureErr } = await supabase.rpc("ensure_profile");
+            if (ensureErr) console.warn("[ensure_profile] error:", ensureErr);
+          } catch (e) {
+            console.warn("[ensure_profile] threw:", e);
+          }
         } else {
           // 2) Handle code-exchange flows if ever used (OAuth)
           const code = new URLSearchParams(window.location.search).get("code");
           if (code) {
             const { data, error } = await supabase.auth.exchangeCodeForSession(code);
             if (error) throw error;
-            await supabase.rpc("ensure_profile").catch(() => {});
+            try {
+              const { error: ensureErr } = await supabase.rpc("ensure_profile");
+              if (ensureErr) console.warn("[ensure_profile] error:", ensureErr);
+            } catch (e) {
+              console.warn("[ensure_profile] threw:", e);
+            }
           }
         }
 
