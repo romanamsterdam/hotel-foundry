@@ -48,7 +48,7 @@ async function fetchProfile(userId: string) {
   } | null;
 }
 
-// ---------- SINGLE helper (do not duplicate) ----------
+// single helper
 async function safeEnsureProfile() {
   if (!supabase) return;
   try {

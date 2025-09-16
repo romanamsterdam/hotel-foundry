@@ -1,7 +1,7 @@
 import * as React from "react";
 import { supabase } from "../lib/supabaseClient";
 
-// Parse tokens from the hash fragment produced by Supabase magic links
+// Parse tokens from Supabase magic-link fragment
 function parseHash() {
   const hash = window.location.hash?.replace(/^#/, "") || "";
   const p = new URLSearchParams(hash);
@@ -12,7 +12,6 @@ function parseHash() {
   };
 }
 
-// (belt & suspenders) create a profile row for the current uid
 async function ensureProfile() {
   if (!supabase) return;
   try {
@@ -31,9 +30,9 @@ export default function AuthCallback() {
       try {
         if (!supabase) throw new Error("Supabase client not configured");
 
-        // 1) If we already have a session (revisits), just go
-        const current = await supabase.auth.getSession();
-        if (current.data?.session) {
+        // If session already exists (revisit), just go
+        const { data: cur } = await supabase.auth.getSession();
+        if (cur?.session) {
           await ensureProfile();
           const to = sessionStorage.getItem("postAuthRedirect") || "/";
           sessionStorage.removeItem("postAuthRedirect");
@@ -44,25 +43,21 @@ export default function AuthCallback() {
 
         const { access_token, refresh_token, code } = parseHash();
 
-        // 2) Magic link case — tokens in hash
+        // Magic link case (tokens in hash)
         if (access_token && refresh_token) {
-          const { error: setErr } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
+          const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
           if (setErr) throw setErr;
 
           await ensureProfile();
 
           const to = sessionStorage.getItem("postAuthRedirect") || "/";
           sessionStorage.removeItem("postAuthRedirect");
-          // Clean hash so we don't reprocess
-          window.history.replaceState({}, "", to);
+          window.history.replaceState({}, "", to); // clean fragment
           window.location.assign(to);
           return;
         }
 
-        // 3) OAuth code flow (if you add providers later)
+        // OAuth code flow (future)
         if (code) {
           const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exchErr) throw exchErr;
@@ -76,7 +71,6 @@ export default function AuthCallback() {
           return;
         }
 
-        // 4) Nothing to finalize
         throw new Error("No auth tokens found in URL.");
       } catch (e: any) {
         console.error("[AuthCallback] error", e);
