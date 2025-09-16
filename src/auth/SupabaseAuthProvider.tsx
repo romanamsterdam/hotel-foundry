@@ -48,7 +48,6 @@ async function fetchProfile(userId: string) {
   } | null;
 }
 
-// single helper
 async function safeEnsureProfile() {
   if (!supabase) return;
   try {
@@ -63,7 +62,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Bootstrap on mount
+  // Bootstrap
   useEffect(() => {
     let mounted = true;
 
@@ -74,8 +73,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         return;
       }
 
-      const { data: sessionRes } = await supabase.auth.getSession();
-      const base = mapBaseUser(sessionRes?.session?.user ?? null);
+      const { data: s } = await supabase.auth.getSession();
+      const base = mapBaseUser(s?.session?.user ?? null);
 
       if (!base) {
         if (mounted) {
@@ -111,15 +110,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         setLoading(false);
       }) ?? { data: undefined };
 
-    return () => {
-      mounted = false;
-      sub?.subscription?.unsubscribe?.();
-    };
+    return () => sub?.subscription?.unsubscribe?.();
   }, []);
 
   const signIn = async ({ email, redirectTo }: { email: string; redirectTo?: string }) => {
     if (!supabase) return;
-    sessionStorage.setItem("postAuthRedirect", redirectTo || "/dashboard");
+    sessionStorage.setItem("postAuthRedirect", redirectTo || "/");
     await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
@@ -127,10 +123,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   };
 
   const signOut = async () => {
-    if (!supabase) {
-      setUser(null);
-      return;
-    }
+    if (!supabase) { setUser(null); return; }
     await supabase.auth.signOut();
     setUser(null);
   };
