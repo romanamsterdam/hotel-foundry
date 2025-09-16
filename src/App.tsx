@@ -45,6 +45,7 @@ import UserRoadmapPageNew from "./pages/roadmap/UserRoadmapPage";
 import ConsultancyRequestPage from "./features/consulting/ConsultancyRequestPage";
 import AdminConsultingPage from "./features/consulting/AdminConsultingPage";
 import DebugEnv from "./pages/DebugEnv";
+import AuthCallback from "./pages/AuthCallback";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { env } from "./lib/env";
 
@@ -118,6 +119,7 @@ function App() {
                       <SignInPage />
                     </PublicLayout>
                   } />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
 
                   {/* Protected Routes */}
                   <Route element={<ProtectedRoute />}>

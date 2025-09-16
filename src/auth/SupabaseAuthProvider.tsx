@@ -85,6 +85,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         return;
       }
 
+      // Ensure profile exists
+      await supabase.rpc("ensure_profile").catch(() => {});
+      
       const prof = await fetchProfile(base.id);
       const merged: AuthUser = {
         ...base,
@@ -110,6 +113,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           return;
         }
         setLoading(true);
+        // Ensure profile exists
+        await supabase.rpc("ensure_profile").catch(() => {});
         const prof = await fetchProfile(base.id);
         setUser({
           ...base,
@@ -127,9 +132,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
   const signIn = async ({ email }: { email: string }) => {
     if (!supabase) return;
+    // Store intended redirect
+    sessionStorage.setItem("postAuthRedirect", "/dashboard");
     await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
   };
 
