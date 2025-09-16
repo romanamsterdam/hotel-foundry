@@ -9,13 +9,17 @@ interface RequireAdminProps {
 }
 
 export default function RequireAdmin({ children }: RequireAdminProps) {
-  const { user } = useAuth();
-  const isAdmin = user?.email === 'admin@hotelfoundry.com'; // Simple admin check
-  const loading = false; // No loading state in mock auth
+  const { user, loading } = useAuth();
 
   if (loading) {
-    return <div className="p-6 text-sm text-muted-foreground">Checking admin permissions…</div>;
+    return (
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="text-sm text-muted-foreground animate-pulse">Checking admin permissions…</div>
+      </div>
+    );
   }
+
+  const isAdmin = user?.role === 'admin';
 
   if (!isAdmin) {
     return (

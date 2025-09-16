@@ -1,43 +1,101 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { AuthUser as MockAuthUser } from "./MockAuthProvider";
-
-export type AuthUser = MockAuthUser;
+import type { AuthUser } from "../types/auth";
 
 type AuthContextValue = {
   user: AuthUser | null;
+  loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   signIn: (opts: { email: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const LS_TIER = "tier";
 
-function mapSbUser(u: any): AuthUser {
-  if (!u) return null as any;
+// Helper: map SB session user -> base AuthUser (without profile fields)
+function mapBaseUser(sbUser: any | null): AuthUser | null {
+  if (!sbUser) return null;
   return {
-    id: u.id,
-    email: u.email ?? undefined,
-    name: u.user_metadata?.name ?? "",
-    avatarUrl: u.user_metadata?.avatar_url ?? "",
-    tier: localStorage.getItem(LS_TIER) ?? "Free",
+    id: sbUser.id,
+    email: sbUser.email ?? undefined,
+    name: sbUser.user_metadata?.name ?? undefined,
+    avatarUrl: sbUser.user_metadata?.avatar_url ?? undefined,
   };
 }
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
+// Fetch profiles row for current user
+async function fetchProfile(userId: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role, subscription, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) {
+    console.warn("[Auth] profiles fetch error:", error);
+    return null;
+  }
+  return data as { role: string; subscription: string; email?: string | null } | null;
+}
 
+export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Initial session + profile load
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (mounted) setUser(mapSbUser(data.session?.user ?? null));
-    })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(mapSbUser(session?.user ?? null));
-    });
+    async function init() {
+      if (!supabase) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const base = mapBaseUser(session?.user ?? null);
+
+      if (!base) {
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const prof = await fetchProfile(base.id);
+      const merged: AuthUser = {
+        ...base,
+        role: prof?.role as AuthUser['role'],
+        subscription: prof?.subscription as AuthUser['subscription'],
+      };
+
+      if (mounted) {
+        setUser(merged);
+        setLoading(false);
+      }
+    }
+
+    init();
+
+    // Subscribe to auth state changes: refresh profile on sign-in/out
+    const { data: sub } = supabase?.auth.onAuthStateChange(async (_e, session) => {
+      const base = mapBaseUser(session?.user ?? null);
+      if (!base) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const prof = await fetchProfile(base.id);
+      setUser({
+        ...base,
+        role: prof?.role as AuthUser['role'],
+        subscription: prof?.subscription as AuthUser['subscription'],
+      });
+      setLoading(false);
+    }) ?? { data: undefined };
 
     return () => {
       mounted = false;
@@ -46,16 +104,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async ({ email }: { email: string }) => {
-    await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
+    if (!supabase) return;
+    await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
   };
 
   const signOut = async () => {
+    if (!supabase) {
+      setUser(null);
+      return;
+    }
     await supabase.auth.signOut();
+    setUser(null);
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, setUser, signIn, signOut }),
-    [user]
+    () => ({ user, loading, setUser, signIn, signOut }),
+    [user, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
