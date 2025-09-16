@@ -1,13 +1,6 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-// Keep the same external shape as your MockAuthProvider user for app-wide compatibility
 export type AuthUser = {
   id: string;
   email?: string;
@@ -21,22 +14,11 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
-  signIn: (opts: { email: string }) => Promise<void>;
+  signIn: (opts: { email: string; redirectTo?: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-// Helper: safely call ensure_profile RPC
-async function safeEnsureProfile() {
-  if (!supabase) return;
-  try {
-    const { error } = await supabase.rpc("ensure_profile");
-    if (error) console.warn("[ensure_profile] error:", error);
-  } catch (e) {
-    console.warn("[ensure_profile] threw:", e);
-  }
-}
 
 function mapBaseUser(sbUser: any | null): AuthUser | null {
   if (!sbUser) return null;
@@ -66,6 +48,17 @@ async function fetchProfile(userId: string) {
   } | null;
 }
 
+// ---------- SINGLE helper (do not duplicate) ----------
+async function safeEnsureProfile() {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.rpc("ensure_profile");
+    if (error) console.warn("[ensure_profile] error:", error);
+  } catch (e) {
+    console.warn("[ensure_profile] threw:", e);
+  }
+}
+
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -75,13 +68,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     let mounted = true;
 
     async function init() {
-      // If Supabase client is not configured (missing envs), don't hang the UI
       if (!supabase) {
-        console.warn("[Auth] Supabase client missing; rendering logged-out state.");
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
+        setUser(null);
+        setLoading(false);
         return;
       }
 
@@ -96,25 +85,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         return;
       }
 
-      // Ensure profile exists
       await safeEnsureProfile();
-      
       const prof = await fetchProfile(base.id);
-      const merged: AuthUser = {
-        ...base,
-        role: prof?.role ?? undefined,
-        subscription: prof?.subscription ?? undefined,
-      };
 
       if (mounted) {
-        setUser(merged);
+        setUser({ ...base, role: prof?.role ?? undefined, subscription: prof?.subscription ?? undefined });
         setLoading(false);
       }
     }
 
     init();
 
-    // Subscribe to auth changes
     const { data: sub } =
       supabase?.auth.onAuthStateChange(async (_event, session) => {
         const base = mapBaseUser(session?.user ?? null);
@@ -126,11 +107,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         setLoading(true);
         await safeEnsureProfile();
         const prof = await fetchProfile(base.id);
-        setUser({
-          ...base,
-          role: prof?.role ?? undefined,
-          subscription: prof?.subscription ?? undefined,
-        });
+        setUser({ ...base, role: prof?.role ?? undefined, subscription: prof?.subscription ?? undefined });
         setLoading(false);
       }) ?? { data: undefined };
 
@@ -140,10 +117,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     };
   }, []);
 
-  const signIn = async ({ email }: { email: string }) => {
+  const signIn = async ({ email, redirectTo }: { email: string; redirectTo?: string }) => {
     if (!supabase) return;
-    // Store intended redirect
-    sessionStorage.setItem("postAuthRedirect", "/dashboard");
+    sessionStorage.setItem("postAuthRedirect", redirectTo || "/dashboard");
     await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },

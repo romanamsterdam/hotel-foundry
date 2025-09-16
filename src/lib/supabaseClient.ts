@@ -7,7 +7,7 @@ export const supabase =
         auth: {
           persistSession: true,          // IMPORTANT
           autoRefreshToken: true,        // IMPORTANT
-          detectSessionInUrl: false,     // we'll handle it on /auth/callback
+          detectSessionInUrl: true,      // IMPORTANT: we let Supabase parse tokens on /auth/callback automatically
         },
       })
     : null;
