@@ -161,16 +161,14 @@ export const supabaseDs: DataSource = {
   },
 
   async createConsultingRequest(input: ConsultingRequestInput) {
-    // Shape must match your table columns
     const payload = {
       name: input.name,
       email: input.email,
-      expertise: input.expertise,         // enum string matches expertise_type
-      seniority: input.seniority,         // enum
+      expertise: input.expertise,    // enum string on FE
+      seniority: input.seniority,    // enum string on FE
       estimated_hours: input.estimatedHours ?? null,
       message: input.message,
-      status: "new",                      // default status
-      assignee: null,
+      // status omitted — DB will default to 'unread'
     };
 
     const { data, error } = await supabase
