@@ -1,71 +1,88 @@
 import * as React from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// Parse tokens from the hash fragment produced by Supabase magic links
+function parseHash() {
+  const hash = window.location.hash?.replace(/^#/, "") || "";
+  const p = new URLSearchParams(hash);
+  return {
+    access_token: p.get("access_token"),
+    refresh_token: p.get("refresh_token"),
+    code: new URLSearchParams(window.location.search).get("code"),
+  };
+}
+
+// (belt & suspenders) create a profile row for the current uid
+async function ensureProfile() {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.rpc("ensure_profile");
+    if (error) console.warn("[ensure_profile] error:", error);
+  } catch (e) {
+    console.warn("[ensure_profile] threw:", e);
+  }
+}
+
 export default function AuthCallback() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!supabase) {
-      setError("Supabase client not configured");
-      return;
-    }
-
-    let unsub: { data?: { subscription?: { unsubscribe?: () => void } } } | null = null;
-    let done = false;
-
-    async function redirectHome() {
-      if (done) return;
-      done = true;
-
-      // belt & suspenders: ensure profiles row exists (ignore errors)
-      try {
-        const { error: ensureErr } = await supabase.rpc("ensure_profile");
-        if (ensureErr) console.warn("[ensure_profile] error:", ensureErr);
-      } catch (e) {
-        console.warn("[ensure_profile] threw:", e);
-      }
-
-      const to = sessionStorage.getItem("postAuthRedirect") || "/";
-      sessionStorage.removeItem("postAuthRedirect");
-      // Clean URL so we don't re-process fragments
-      window.history.replaceState({}, "", to);
-      window.location.assign(to);
-    }
-
     (async () => {
       try {
-        // 1) If the client already parsed the URL and we have a session, go.
-        const { data } = await supabase.auth.getSession();
-        if (data?.session) {
-          await redirectHome();
+        if (!supabase) throw new Error("Supabase client not configured");
+
+        // 1) If we already have a session (revisits), just go
+        const current = await supabase.auth.getSession();
+        if (current.data?.session) {
+          await ensureProfile();
+          const to = sessionStorage.getItem("postAuthRedirect") || "/";
+          sessionStorage.removeItem("postAuthRedirect");
+          window.history.replaceState({}, "", to);
+          window.location.assign(to);
           return;
         }
 
-        // 2) Otherwise wait for Supabase to finish parsing and emit SIGNED_IN.
-        unsub = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === "SIGNED_IN" && session) {
-            await redirectHome();
-          }
-        });
+        const { access_token, refresh_token, code } = parseHash();
 
-        // 3) Watchdog: if nothing happens in 7s, show an error (bad redirect or stale link)
-        setTimeout(async () => {
-          if (!done) {
-            const { data: again } = await supabase.auth.getSession();
-            if (again?.session) {
-              await redirectHome();
-            } else {
-              setError("No auth tokens found or link expired.");
-            }
-          }
-        }, 7000);
+        // 2) Magic link case — tokens in hash
+        if (access_token && refresh_token) {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (setErr) throw setErr;
+
+          await ensureProfile();
+
+          const to = sessionStorage.getItem("postAuthRedirect") || "/";
+          sessionStorage.removeItem("postAuthRedirect");
+          // Clean hash so we don't reprocess
+          window.history.replaceState({}, "", to);
+          window.location.assign(to);
+          return;
+        }
+
+        // 3) OAuth code flow (if you add providers later)
+        if (code) {
+          const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchErr) throw exchErr;
+
+          await ensureProfile();
+
+          const to = sessionStorage.getItem("postAuthRedirect") || "/";
+          sessionStorage.removeItem("postAuthRedirect");
+          window.history.replaceState({}, "", to);
+          window.location.assign(to);
+          return;
+        }
+
+        // 4) Nothing to finalize
+        throw new Error("No auth tokens found in URL.");
       } catch (e: any) {
         console.error("[AuthCallback] error", e);
         setError(e?.message ?? "Sign in failed.");
       }
     })();
-
-    return () => unsub?.data?.subscription?.unsubscribe?.();
   }, []);
 
   return (
