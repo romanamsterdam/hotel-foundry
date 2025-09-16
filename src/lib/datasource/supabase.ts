@@ -1,5 +1,6 @@
 import { supabase } from "../../lib/supabaseClient";
 import type { DataSource, Project, ProjectInput, RoadmapTask, ConsultingRequest, UUID } from "./types";
+import type { ConsultingRequestInput, ConsultingRequestResult } from "./types";
 
 const isUuid = (v?: string | null) =>
   !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
@@ -157,5 +158,28 @@ export const supabaseDs: DataSource = {
       .single();
     if (error) throw error;
     return data as ConsultingRequest;
+  },
+
+  async createConsultingRequest(input: ConsultingRequestInput) {
+    // Shape must match your table columns
+    const payload = {
+      name: input.name,
+      email: input.email,
+      expertise: input.expertise,         // text[] in table (ok to pass array)
+      seniority: input.seniority,         // enum
+      estimated_hours: input.estimatedHours ?? null,
+      message: input.message,
+      status: "unread",                   // default status
+      assignee: null,
+    };
+
+    const { data, error } = await supabase
+      .from("consulting_requests")
+      .insert(payload)
+      .select("id, created_at")
+      .single();
+
+    if (error) return { error: error.message };
+    return { data: data as ConsultingRequestResult, error: null };
   },
 };

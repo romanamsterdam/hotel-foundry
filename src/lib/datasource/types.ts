@@ -1,5 +1,26 @@
 export type UUID = string;
 
+export type ConsultingSeniority = "junior" | "standard" | "partner";
+export type ConsultingExpertise =
+  | "operations"
+  | "finance"
+  | "development"
+  | "other";
+
+export interface ConsultingRequestInput {
+  name: string;
+  email: string;
+  expertise: ConsultingExpertise[];
+  seniority: ConsultingSeniority;
+  estimatedHours?: number | null;
+  message: string;
+}
+
+export interface ConsultingRequestResult {
+  id: string;
+  created_at?: string;
+}
+
 export type Project = {
   id: UUID;
   name: string;
@@ -59,4 +80,8 @@ export interface DataSource {
   upsertTask(input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }): Promise<RoadmapTask>;
   listConsulting(): Promise<ConsultingRequest[]>;
   updateConsulting(id: UUID, patch: Partial<ConsultingRequest>): Promise<ConsultingRequest>;
+  // REQUIRED in both mock and supabase:
+  createConsultingRequest(
+    input: ConsultingRequestInput
+  ): Promise<{ data?: ConsultingRequestResult; error?: string | null }>;
 }

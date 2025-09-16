@@ -1,5 +1,6 @@
 import type { DataSource, Project, RoadmapTask, ConsultingRequest, UUID } from "./types";
 import type { ProjectInput } from "../../types/projects";
+import type { ConsultingRequestInput, ConsultingRequestResult } from "./types";
 
 const LS_KEY = "hf-mock";
 type Store = { projects: Project[]; tasks: RoadmapTask[]; consulting: ConsultingRequest[]; };
@@ -122,6 +123,30 @@ export const mockDs: DataSource = {
     Object.assign(c, patch);
     persist();
     return c;
+  },
+
+  async createConsultingRequest(input: ConsultingRequestInput) {
+    console.log("[mock] createConsultingRequest", input);
+    const id = crypto.randomUUID();
+    const result: ConsultingRequestResult = { 
+      id, 
+      created_at: new Date().toISOString() 
+    };
+    
+    // Add to store for admin viewing
+    const req: ConsultingRequest = {
+      id,
+      user_id: null,
+      message: input.message,
+      notes: null,
+      status: "unread",
+      assignee: null,
+      created_at: result.created_at
+    };
+    store.consulting.unshift(req);
+    persist();
+    
+    return { data: result, error: null };
   },
 };
 

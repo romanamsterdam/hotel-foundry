@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../ui/toast";
-import { env } from "../../config/env";
-import type { ConsultingRequestInput } from "../../types/consulting";
+import { getDataSource } from "../../lib/datasource";
+import type { ConsultingRequestInput } from "../../lib/datasource/types";
 
 // If you use shadcn/ui, uncomment these and remove the minimal elements below
 // import { Button } from "@/components/ui/button";
@@ -44,63 +44,51 @@ export default function ConsultingRequestForm() {
     }
   }, [user?.id]);
 
-  // Import the appropriate create function based on data source
-  const createConsultingRequest = React.useMemo(() => {
-    if (env.DATA_SOURCE === "supabase") {
-      return async (input: any) => {
-        const { createConsultingRequest } = await import("../../lib/datasource/supabase");
-        return createConsultingRequest(input);
-      };
-    } else {
-      return async (input: any) => {
-        const { createConsultingRequest } = await import("../../lib/datasource/mock");
-        return createConsultingRequest(input);
-      };
-    }
-  }, []);
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     
     try {
-      // basic requireds (you already have required on inputs—this is belt & braces)
+      // Basic validation
       if (!email.trim() || !summary.trim()) {
         toast.error("Please provide your email and a short project summary.");
         setSubmitting(false);
         return;
       }
 
-      // Insert to database with standardized API
-      const { data, error } = await createConsultingRequest({
+      const ds = getDataSource();
+      if (typeof ds.createConsultingRequest !== "function") {
+        throw new Error("DataSource misconfigured: createConsultingRequest not a function");
+      }
+
+      const payload: ConsultingRequestInput = {
         name,
         email,
-        expertise,
+        expertise: [expertise], // Convert single selection to array
         seniority,
-        estimated_hours: hoursHint ? Number(hoursHint) || null : null,
+        estimatedHours: hoursHint ? Number(hoursHint) || null : null,
         message: summary,
-        user_id: user?.id ?? null,
-      });
+      };
+
+      const { data, error } = await ds.createConsultingRequest(payload);
 
       if (error) {
-        console.error("[Consulting submit] API error:", error);
-        toast.error(`Could not submit: ${error}`);
+        toast.error(error);
         return;
       }
 
-      toast.success("Thanks! We'll review and send a proposal within 24 hours.");
-      // Optional: clear form
+      toast.success("Request sent. We'll reply within 24h.");
+      // Clear form
       setSummary("");
       setHoursHint("");
       setExpertise("operations");
-      // Keep name/email if user is signed in
       if (!user) {
         setName("");
         setEmail("");
       }
-    } catch (e: any) {
-      console.error("[Consulting submit] threw:", e);
-      toast.error(e?.message ?? "Unexpected error. See console for details.");
+    } catch (err: any) {
+      console.error("[Consulting submit] failed:", err);
+      toast.error(err?.message || "Could not submit request");
     } finally {
       setSubmitting(false);
     }
