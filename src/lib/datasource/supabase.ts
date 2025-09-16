@@ -81,10 +81,13 @@ export const supabaseDs: DataSource = {
         .update(payload)
         .eq("id", input.id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) {
         console.error("[saveProject][supabase] update error:", error, { input, payload });
         throw new Error(error.message);
+      }
+      if (!data) {
+        throw new Error("Project not found for update");
       }
       console.log("[saveProject][supabase] updated id", data?.id);
       return data as Project;
@@ -99,10 +102,13 @@ export const supabaseDs: DataSource = {
       .from("projects")
       .insert(insertRow)
       .select()
-      .single();
+      .maybeSingle();
     if (error) {
       console.error("[saveProject][supabase] insert error:", error, { input, insertRow });
       throw new Error(error.message);
+    }
+    if (!data) {
+      throw new Error("Failed to create project");
     }
     console.log("[saveProject][supabase] created id", data?.id);
     return data as Project;
@@ -126,16 +132,18 @@ export const supabaseDs: DataSource = {
         .update(input)
         .eq("id", input.id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Task not found for update");
       return data as RoadmapTask;
     } else {
       const { data, error } = await supabase
         .from("roadmap_tasks")
         .insert(input)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Failed to create task");
       return data as RoadmapTask;
     }
   },
@@ -155,29 +163,41 @@ export const supabaseDs: DataSource = {
       .update(patch)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error("Consulting request not found");
     return data as ConsultingRequest;
   },
 
   async createConsultingRequest(input: ConsultingRequestInput) {
+    // Shape must match your table columns
     const payload = {
       name: input.name,
       email: input.email,
-      expertise: input.expertise,    // enum string on FE
-      seniority: input.seniority,    // enum string on FE
+      expertise: input.expertise,         // enum string on FE
+      seniority: input.seniority,         // enum string on FE
       estimated_hours: input.estimatedHours ?? null,
       message: input.message,
       // status omitted — DB will default to 'unread'
     };
 
-    const { data, error } = await supabase
+    // IMPORTANT: returning:'minimal' so RLS doesn't require SELECT on the inserted row
+    const { error } = await supabase
       .from("consulting_requests")
-      .insert(payload)
-      .select("id, created_at")
-      .single();
+      .insert(payload, { returning: 'minimal' });
 
-    if (error) return { error: error.message };
-    return { data: data as ConsultingRequestResult, error: null };
+    if (error) {
+      console.error('[consulting] insert error:', error);
+      return { error: error.message };
+    }
+
+    // Don't depend on selecting it back - just return success
+    return { 
+      data: { 
+        id: crypto.randomUUID(), // placeholder ID for UI feedback
+        created_at: new Date().toISOString() 
+      } as ConsultingRequestResult, 
+      error: null 
+    };
   },
 };
