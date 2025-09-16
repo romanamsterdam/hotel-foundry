@@ -1,11 +1,12 @@
+// src/auth/SupabaseAuthProvider.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 export type AuthUser = {
   id: string;
-  email?: string;
-  name?: string;
-  avatarUrl?: string;
+  email?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
   role?: "user" | "admin";
   subscription?: "free" | "starter" | "pro" | "beta";
 };
@@ -20,115 +21,94 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function mapBaseUser(sbUser: any | null): AuthUser | null {
-  if (!sbUser) return null;
-  return {
-    id: sbUser.id,
-    email: sbUser.email ?? undefined,
-    name: sbUser.user_metadata?.name ?? undefined,
-    avatarUrl: sbUser.user_metadata?.avatar_url ?? undefined,
-  };
-}
-
-async function fetchProfile(userId: string) {
+async function getProfile(userId: string) {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select("role, subscription, email")
+    .select("email, role, subscription")
     .eq("id", userId)
-    .maybeSingle();
-  if (error) {
-    console.warn("[Auth] profiles fetch error:", error);
-    return null;
-  }
-  return data as {
-    role?: "user" | "admin" | null;
-    subscription?: "free" | "starter" | "pro" | "beta" | null;
-    email?: string | null;
-  } | null;
-}
-
-async function safeEnsureProfile() {
-  if (!supabase) return;
-  try {
-    const { error } = await supabase.rpc("ensure_profile");
-    if (error) console.warn("[ensure_profile] error:", error);
-  } catch (e) {
-    console.warn("[ensure_profile] threw:", e);
-  }
+    .single();
+  if (error) return null;
+  return data;
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  // Bootstrap
+  // Bootstrap current session
   useEffect(() => {
     let mounted = true;
 
-    async function init() {
+    (async () => {
       if (!supabase) {
         setUser(null);
         setLoading(false);
         return;
       }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData?.session ?? null;
 
-      const { data: s } = await supabase.auth.getSession();
-      const base = mapBaseUser(s?.session?.user ?? null);
+      if (session?.user) {
+        const u = session.user;
+        const prof = await getProfile(u.id);
+        if (!mounted) return;
+        setUser({
+          id: u.id,
+          email: u.email,
+          name: u.user_metadata?.full_name ?? null,
+          avatarUrl: u.user_metadata?.avatar_url ?? null,
+          role: (prof?.role as AuthUser["role"]) ?? "user",
+          subscription: (prof?.subscription as AuthUser["subscription"]) ?? "free",
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    })();
 
-      if (!base) {
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
+    const { data: sub } = supabase?.auth.onAuthStateChange(async (event, sess) => {
+      if (!sess?.user) {
+        setUser(null);
         return;
       }
+      const u = sess.user;
+      const prof = await getProfile(u.id);
+      setUser({
+        id: u.id,
+        email: u.email,
+        name: u.user_metadata?.full_name ?? null,
+        avatarUrl: u.user_metadata?.avatar_url ?? null,
+        role: (prof?.role as AuthUser["role"]) ?? "user",
+        subscription: (prof?.subscription as AuthUser["subscription"]) ?? "free",
+      });
+    }) ?? { unsubscribe: () => {} };
 
-      await safeEnsureProfile();
-      const prof = await fetchProfile(base.id);
-
-      if (mounted) {
-        setUser({ ...base, role: prof?.role ?? undefined, subscription: prof?.subscription ?? undefined });
-        setLoading(false);
-      }
-    }
-
-    init();
-
-    const { data: sub } =
-      supabase?.auth.onAuthStateChange(async (_event, session) => {
-        const base = mapBaseUser(session?.user ?? null);
-        if (!base) {
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-        setLoading(true);
-        await safeEnsureProfile();
-        const prof = await fetchProfile(base.id);
-        setUser({ ...base, role: prof?.role ?? undefined, subscription: prof?.subscription ?? undefined });
-        setLoading(false);
-      }) ?? { data: undefined };
-
-    return () => sub?.subscription?.unsubscribe?.();
+    return () => {
+      mounted = false;
+      sub.subscription?.unsubscribe?.();
+    };
   }, []);
 
   const signIn = async ({ email, redirectTo }: { email: string; redirectTo?: string }) => {
-    if (!supabase) return;
-    sessionStorage.setItem("postAuthRedirect", redirectTo || "/");
-    await supabase.auth.signInWithOtp({
+    if (!supabase) throw new Error("Supabase client not initialized");
+    const fallback = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        emailRedirectTo: redirectTo ?? fallback,
+        // NOTE: magic link default; we can add captcha or data payload later
+      },
     });
+    if (error) throw error;
   };
 
   const signOut = async () => {
-    if (!supabase) { setUser(null); return; }
+    if (!supabase) return;
     await supabase.auth.signOut();
-    setUser(null);
   };
 
-  const value = useMemo<AuthContextValue>(
+  const value = useMemo(
     () => ({ user, loading, setUser, signIn, signOut }),
     [user, loading]
   );
@@ -138,6 +118,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider (supabase)");
+  if (!ctx) throw new Error("useAuth must be used within Supabase AuthProvider");
   return ctx;
 }

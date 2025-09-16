@@ -23,7 +23,7 @@ export default function SignInPage() {
     
     setLoading(true);
     try {
-      await signIn({ email: email.trim() });
+      await signIn({ email: email.trim(), redirectTo: `${window.location.origin}/auth/callback` });
       toast.success("Check your email for the magic link!");
     } catch (error) {
       toast.error("Failed to send magic link. Please try again.");
