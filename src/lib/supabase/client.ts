@@ -8,7 +8,9 @@ export const supabase = createClient(url, anon, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    // We will handle the magic-link hash ourselves on /auth/callback
+    // We handle the magic-link callback ourselves on /auth/callback
     detectSessionInUrl: false,
+    // Required for exchangeCodeForSession to work
+    flowType: "pkce",
   },
 });

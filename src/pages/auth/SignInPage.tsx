@@ -31,7 +31,7 @@ export default function SignInPage() {
       <div className="max-w-md mx-auto text-center space-y-4 py-12">
         <h1 className="text-3xl font-bold">Check your email</h1>
         <p className="text-slate-600">
-          If an account exists for <strong>{email}</strong>, you'll receive a magic link to sign in.
+          If your email is registered, you will receive a login link.
         </p>
         <Link to="/" className="text-brand-600 hover:text-brand-700 font-medium text-sm">
           Return to home

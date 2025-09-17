@@ -1,32 +1,50 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
 
 export default function AuthCallback() {
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the auth provider is still loading the user session, just wait.
-    if (loading) {
-      return;
-    }
+    (async () => {
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
 
-    // Once loading is complete, check if we got a user.
-    if (user) {
-      // Success! Redirect to the main dashboard.
-      navigate("/dashboard", { replace: true });
-    } else {
-      // If there's no user, the sign-in failed. Go back to the sign-in page.
-      // This could happen with an expired token, for example.
-      navigate("/signin", { replace: true });
-    }
-  }, [user, loading, navigate]);
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          navigate("/dashboard", { replace: true });
+          return;
+        }
 
-  // Display a consistent message while the logic runs.
+        // Fallback: implicit/hash flow (rare with PKCE, but safe to support)
+        if (location.hash.includes("access_token")) {
+          const params = new URLSearchParams(location.hash.slice(1));
+          const access_token = params.get("access_token");
+          const refresh_token = params.get("refresh_token");
+          if (access_token && refresh_token) {
+            const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (error) throw error;
+            navigate("/dashboard", { replace: true });
+            return;
+          }
+        }
+
+        setError("No auth code found. The link may be expired.");
+      } catch (e: any) {
+        setError(e?.message ?? "Failed to finish sign-in.");
+      }
+    })();
+  }, [navigate, location.hash]);
+
   return (
-    <div className="min-h-[40vh] flex items-center justify-center">
-      <div className="text-sm text-slate-600 animate-pulse">Finishing sign-in…</div>
+    <div className="min-h-[50vh] grid place-items-center">
+      <div className="text-sm text-slate-600">
+        {error ? <span className="text-red-600">{error}</span> : "Finishing sign-in…"}
+      </div>
     </div>
   );
 }
