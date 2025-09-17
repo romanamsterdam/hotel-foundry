@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "../auth/AuthProvider";
 
 function FullscreenSpinner() {
   return (
@@ -11,11 +11,8 @@ function FullscreenSpinner() {
 }
 
 export default function ProtectedRoute() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
-  
-  // Check if we're still loading auth state
-  const { loading } = useAuth();
   
   if (loading) {
     return <FullscreenSpinner />;
