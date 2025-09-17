@@ -1,21 +1,31 @@
-// src/routes/DashboardPage.tsx
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
-// import DealList from "../components/DealList"; // REMOVE THIS LINE
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 
+const FEATURE_ADMIN = import.meta.env.VITE_FEATURE_ADMIN !== "false";
+
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const isAdmin = !!user && user.role === "admin";
 
   return (
     <div className="space-y-6">
       {/* Admin Console Link */}
-      {user?.role === 'admin' && (
-        <div className="p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-md">
-          <p className="font-bold">Admin View</p>
-          <p>You are signed in as an administrator. <Link to="/admin" className="underline hover:text-yellow-900">Go to Admin Console</Link>.</p>
-        </div>
+      {FEATURE_ADMIN && isAdmin && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-amber-900">Admin Tools</h3>
+                <p className="text-sm text-amber-800">You have administrator access</p>
+              </div>
+              <Button asChild className="bg-slate-900 hover:bg-slate-800">
+                <Link to="/admin">Open Admin Console</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card>
@@ -26,7 +36,6 @@ export default function DashboardPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          {/* REPLACE <DealList /> WITH THIS PLACEHOLDER */}
           <div className="text-center py-8">
             <p className="text-slate-500">Your deals will be listed here.</p>
           </div>
