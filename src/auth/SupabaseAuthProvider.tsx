@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-// Helper functions remain the same
 function isValidEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
@@ -20,6 +19,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
+  signUp: (email: string, password?: string) => Promise<{ ok: boolean; error?: string; requiresConfirmation?: boolean }>;
   signIn: (email: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
 };
@@ -38,7 +38,7 @@ async function fetchProfile(userId: string) {
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true); // Start as true
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!supabase) {
@@ -47,7 +47,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       return;
     }
 
-    // Rely *only* on onAuthStateChange. It fires immediately with the current session.
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const u = session.user;
@@ -63,7 +62,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       } else {
         setUser(null);
       }
-      // This is critical: set loading to false *after* the first auth check completes.
       setLoading(false);
     });
 
@@ -71,6 +69,33 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       authListener?.subscription.unsubscribe();
     };
   }, []);
+
+  const signUp = async (email: string, password?: string) => {
+    if (!supabase) {
+      return { ok: false, error: "Auth client not configured" };
+    }
+    if (!password || password.length < 8) {
+      return { ok: false, error: "Password must be at least 8 characters." };
+    }
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      if (error) throw error;
+      // If there's a user but no session, it means they need to confirm their email
+      if (data.user && !data.session) {
+        return { ok: true, requiresConfirmation: true };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.error("[Auth] signUp error:", e);
+      return { ok: false, error: e.message ?? "Sign up failed." };
+    }
+  };
 
   const signIn = async (email: string) => {
     try {
@@ -81,10 +106,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       if (!supabase) {
         return { ok: false, error: "Supabase not configured" };
       }
-      const origin = window.location.origin;
-      const { error } = await supabase.auth.signInWithOtp({
-        email: emailStr,
-        options: { emailRedirectTo: `${origin}/auth/callback` },
+      // Invoke the new edge function
+      const { error } = await supabase.functions.invoke('send-magic-link', {
+        body: { email: emailStr },
       });
       if (error) throw error;
       return { ok: true };
@@ -100,7 +124,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   };
 
   const value = useMemo(
-    () => ({ user, loading, setUser, signIn, signOut }),
+    () => ({ user, loading, setUser, signIn, signOut, signUp }),
     [user, loading]
   );
 
