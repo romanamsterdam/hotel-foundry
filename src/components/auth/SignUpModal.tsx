@@ -1,10 +1,9 @@
-// src/components/auth/SignUpModal.tsx
-import { useState } from 'react';
-import { useAuth } from '../../auth/useAuth';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
-import { Input } from '../ui/input';
-import { Button } from '../ui/button';
-import { Alert, AlertDescription } from '../ui/alert';
+import { useState } from "react";
+import { useAuth } from "../../auth/AuthProvider";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Alert, AlertDescription } from "../ui/alert";
 
 type SignUpModalProps = {
   isOpen: boolean;
@@ -12,9 +11,9 @@ type SignUpModalProps = {
 };
 
 export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
-  const { signUp } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signUp } = useAuth(); // <-- only once
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -23,30 +22,26 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password, 
-      options: { emailRedirectTo: redirectTo } 
-    });
-    setIsSubmitting(false);
-    if (!error) {
+    try {
+      const res = await signUp(email, password);
+      if (!res.ok) throw new Error(res.error || "Sign up failed");
       setIsSuccess(true);
-    } else {
-      setError(error.message ?? 'An unknown error occurred.');
+    } catch (e: any) {
+      setError(e?.message ?? "An unknown error occurred.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    // Reset state when closing the dialog
-    setEmail('');
-    setPassword('');
+    setEmail("");
+    setPassword("");
     setError(null);
     setIsSubmitting(false);
     setIsSuccess(false);
     onClose();
   };
-  
+
   if (isSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -54,7 +49,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
           <DialogHeader>
             <DialogTitle>Check your email</DialogTitle>
             <DialogDescription>
-              We've sent a confirmation link to <strong>{email}</strong>. Please click the link to complete your registration.
+              We’ve sent a confirmation link to <strong>{email}</strong>. Click it to complete your registration.
             </DialogDescription>
           </DialogHeader>
         </DialogContent>
@@ -67,9 +62,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Get Beta Access to Hotel Foundry</DialogTitle>
-          <DialogDescription>
-            Create an account to start modeling your first hotel deal.
-          </DialogDescription>
+          <DialogDescription>Create an account to start modeling your first hotel deal.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -94,7 +87,7 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
             </Alert>
           )}
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating Account...' : 'Create Account'}
+            {isSubmitting ? "Creating Account..." : "Create Account"}
           </Button>
         </form>
       </DialogContent>
