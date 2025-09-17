@@ -1,69 +1,123 @@
-// src/pages/auth/SignInPage.tsx
 import { useState } from "react";
-import { useAuth } from "../../auth/useAuth";
-import { Link } from "react-router-dom";
-import { Alert, AlertDescription } from "../../components/ui/alert";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+import { supabase } from "../../lib/supabase/client";
+
+type Mode = "password" | "magic";
 
 export default function SignInPage() {
-  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [pwd, setPwd] = useState("");
+  const [mode, setMode] = useState<Mode>("password");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+  async function onPasswordLogin(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-    const result = await signIn(email);
-    setIsSubmitting(false);
-    if (result.ok) {
-      setIsSuccess(true);
-    } else {
-      setError(result.error ?? "An unknown error occurred.");
+    setErr(null); setMsg(null);
+    if (!isEmail(email)) return setErr("Enter a valid email.");
+    if (!pwd) return setErr("Enter your password.");
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+      if (error) throw error;
+      // supabase-js will fire onAuthStateChange; router guard should push to /dashboard
+      setMsg("Signed in. Redirecting…");
+      window.location.assign("/dashboard");
+    } catch (e: any) {
+      setErr(e?.message ?? "Sign-in failed.");
+    } finally {
+      setBusy(false);
     }
-  };
+  }
 
-  if (isSuccess) {
-    return (
-      <div className="max-w-md mx-auto text-center space-y-4 py-12">
-        <h1 className="text-3xl font-bold">Check your email</h1>
-        <p className="text-slate-600">
-          If your email is registered, you will receive a login link.
-        </p>
-        <Link to="/" className="text-brand-600 hover:text-brand-700 font-medium text-sm">
-          Return to home
-        </Link>
-      </div>
-    );
+  async function onMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null); setMsg(null);
+    if (!isEmail(email)) return setErr("Enter a valid email.");
+    setBusy(true);
+    try {
+      // call your edge function that only sends to confirmed users
+      const { error } = await supabase.functions.invoke("send-magic-link", {
+        body: { email },
+      });
+      if (error) throw error;
+      setMsg("If your email is registered, you will receive a login link.");
+    } catch (e: any) {
+      setErr(e?.message ?? "Could not send link.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onForgotPassword() {
+    setErr(null); setMsg(null);
+    if (!isEmail(email)) return setErr("Enter your email first.");
+    try {
+      const redirectTo = `${window.location.origin}/auth/reset`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      setMsg("Password reset email sent (if the account exists).");
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to send reset email.");
+    }
   }
 
   return (
-    <div className="max-w-sm mx-auto py-12">
-      <div className="space-y-3 text-center mb-8">
-        <h1 className="text-3xl font-bold">Sign In</h1>
-        <p className="text-slate-600">Enter your email to get a magic link.</p>
+    <div className="max-w-md mx-auto p-6">
+      <h1 className="text-xl font-semibold mb-4">Sign in</h1>
+
+      <div className="mb-4 flex gap-2">
+        <button
+          onClick={() => setMode("password")}
+          className={`px-3 py-1 rounded ${mode==="password" ? "bg-black text-white" : "bg-slate-200"}`}
+        >
+          Password
+        </button>
+        <button
+          onClick={() => setMode("magic")}
+          className={`px-3 py-1 rounded ${mode==="magic" ? "bg-black text-white" : "bg-slate-200"}`}
+        >
+          Magic link
+        </button>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
+
+      <form onSubmit={mode==="password" ? onPasswordLogin : onMagicLink} className="space-y-3">
+        <input
           type="email"
-          placeholder="Email address"
+          placeholder="email@domain.com"
+          className="w-full border rounded px-3 py-2"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={isSubmitting}
+          autoComplete="email"
         />
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+        {mode === "password" && (
+          <input
+            type="password"
+            placeholder="Your password"
+            className="w-full border rounded px-3 py-2"
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            autoComplete="current-password"
+          />
         )}
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Sending Link..." : "Send Magic Link"}
-        </Button>
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded bg-black text-white py-2"
+        >
+          {busy ? "Please wait…" : (mode === "password" ? "Sign in" : "Send magic link")}
+        </button>
       </form>
+
+      <div className="mt-3 text-right">
+        <button onClick={onForgotPassword} className="text-sm underline">Forgot password?</button>
+      </div>
+
+      {msg && <p className="mt-3 text-green-700 text-sm">{msg}</p>}
+      {err && <p className="mt-3 text-red-600 text-sm">{err}</p>}
     </div>
   );
 }

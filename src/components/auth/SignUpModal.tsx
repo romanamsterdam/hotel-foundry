@@ -23,12 +23,17 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    const result = await signUp(email, password);
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password, 
+      options: { emailRedirectTo: redirectTo } 
+    });
     setIsSubmitting(false);
-    if (result.ok) {
+    if (!error) {
       setIsSuccess(true);
     } else {
-      setError(result.error ?? 'An unknown error occurred.');
+      setError(error.message ?? 'An unknown error occurred.');
     }
   };
 

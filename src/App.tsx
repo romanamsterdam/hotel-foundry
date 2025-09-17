@@ -45,6 +45,7 @@ import ConsultancyRequestPage from "./features/consulting/ConsultancyRequestPage
 import AdminConsultingPage from "./features/consulting/AdminConsultingPage";
 import DebugEnv from "./pages/DebugEnv";
 import AuthCallback from "./pages/AuthCallback";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 
 // A prop type to pass down the click handler
 type PageProps = {
@@ -107,6 +108,7 @@ function App() {
                   <Route path="/legal/terms" element={<PublicLayout><LegalTermsPage /></PublicLayout>} />
                   <Route path="/signin" element={<PublicLayout><SignInPage /></PublicLayout>} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/auth/reset" element={<ResetPasswordPage />} />
 
                   {/* Protected Routes */}
                   <Route element={<ProtectedRoute />}>
