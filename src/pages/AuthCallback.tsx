@@ -19,18 +19,23 @@ async function ensureProfileBeta() {
   const user = u?.user;
   if (!user) return;
 
-  // Try upsert; RLS must allow inserting own profile (see SQL below).
-  await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        email: user.email,
-        role: "user",
-        subscription: "beta",
-      },
-      { onConflict: "id", ignoreDuplicates: false }
-    );
+  try {
+    await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email,
+          // If your DB uses an enum that doesn't include 'beta' yet,
+          // this will fail; we catch and ignore below.
+          role: "user",
+          subscription: "beta",
+        },
+        { onConflict: "id", ignoreDuplicates: false }
+      );
+  } catch (err) {
+    console.warn("[AuthCallback] ensureProfileBeta failed (non-fatal):", err);
+  }
 }
 
 export default function AuthCallback() {
@@ -48,51 +53,60 @@ export default function AuthCallback() {
       }
 
       try {
+        // 0) If Supabase already consumed the URL and we have a session, just proceed.
+        const { data: sess0 } = await supabase.auth.getSession();
+        if (sess0?.session) {
+          window.history.replaceState(null, "", "/auth/callback"); // drop hash/query
+          await ensureProfileBeta();
+          if (!mounted) return;
+          setView("ok");
+          setMessage("Signed in! Redirecting…");
+          setTimeout(() => window.location.replace("/dashboard"), 300);
+          return;
+        }
+
+        // 1) PKCE code flow?
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
         const error = url.searchParams.get("error_description");
-
         if (error) {
           setView("error");
           setMessage(decodeURIComponent(error));
           return;
         }
-
         if (code) {
-          // PKCE flow
           const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
           if (exErr) throw exErr;
+          window.history.replaceState(null, "", "/auth/callback");
         } else {
-          // Hash tokens flow
+          // 2) Hash tokens flow?
           const { access_token, refresh_token } = parseHashTokens();
           if (access_token && refresh_token) {
             const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
             if (setErr) throw setErr;
+            window.history.replaceState(null, "", "/auth/callback");
           } else {
             throw new Error("No auth code or tokens found in callback URL.");
           }
         }
 
+        // 3) Profile upsert is non-blocking: ignore failures.
         await ensureProfileBeta();
 
         if (!mounted) return;
         setView("ok");
         setMessage("Signed in! Redirecting…");
-        // Small delay so the UI can toast if needed
-        setTimeout(() => {
-          window.location.replace("/dashboard");
-        }, 400);
+        setTimeout(() => window.location.replace("/dashboard"), 300);
       } catch (e: any) {
         if (!mounted) return;
+        console.error("[AuthCallback] finalize error:", e);
         setView("error");
         setMessage(e?.message ?? "Could not finalize sign-in.");
       }
     }
 
     finalize();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   if (view === "error") {

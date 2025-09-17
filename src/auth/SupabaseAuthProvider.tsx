@@ -15,28 +15,26 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
-  signIn: (opts: { email: string; redirectTo?: string }) => Promise<void>;
+  signIn: (email: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function getProfile(userId: string) {
+async function fetchProfile(userId: string) {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("email, role, subscription")
-    .eq("id", userId)
-    .single();
-  if (error) return null;
-  return data;
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  if (error) {
+    console.warn("[Auth] profiles fetch error (non-fatal):", error);
+    return null;
+  }
+  return data ?? null;
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Bootstrap current session
   useEffect(() => {
     let mounted = true;
 
@@ -51,7 +49,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
       if (session?.user) {
         const u = session.user;
-        const prof = await getProfile(u.id);
+        const prof = await fetchProfile(u.id);
         if (!mounted) return;
         setUser({
           id: u.id,
@@ -67,40 +65,47 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       setLoading(false);
     })();
 
-    const { data: sub } = supabase?.auth.onAuthStateChange(async (event, sess) => {
-      if (!sess?.user) {
+    const { data: sub } = supabase?.auth.onAuthStateChange(async (_event, sess) => {
+      const session = sess ?? null;
+      if (!mounted) return;
+
+      if (session?.user) {
+        const u = session.user;
+        const prof = await fetchProfile(u.id);
+        if (!mounted) return;
+        setUser({
+          id: u.id,
+          email: u.email,
+          name: u.user_metadata?.full_name ?? null,
+          avatarUrl: u.user_metadata?.avatar_url ?? null,
+          role: (prof?.role as AuthUser["role"]) ?? "user",
+          subscription: (prof?.subscription as AuthUser["subscription"]) ?? "free",
+        });
+      } else {
         setUser(null);
-        return;
       }
-      const u = sess.user;
-      const prof = await getProfile(u.id);
-      setUser({
-        id: u.id,
-        email: u.email,
-        name: u.user_metadata?.full_name ?? null,
-        avatarUrl: u.user_metadata?.avatar_url ?? null,
-        role: (prof?.role as AuthUser["role"]) ?? "user",
-        subscription: (prof?.subscription as AuthUser["subscription"]) ?? "free",
-      });
     }) ?? { unsubscribe: () => {} };
 
     return () => {
+      setTimeout(() => sub?.subscription?.unsubscribe?.(), 0);
       mounted = false;
-      sub.subscription?.unsubscribe?.();
     };
   }, []);
 
-  const signIn = async ({ email, redirectTo }: { email: string; redirectTo?: string }) => {
-    if (!supabase) throw new Error("Supabase client not initialized");
-    const fallback = `${window.location.origin}/auth/callback`;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: redirectTo ?? fallback,
-        // NOTE: magic link default; we can add captcha or data payload later
-      },
-    });
-    if (error) throw error;
+  const signIn = async (email: string) => {
+    if (!supabase) return { ok: false, error: "Supabase not configured" };
+    try {
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${origin}/auth/callback` },
+      });
+      if (error) throw error;
+      return { ok: true };
+    } catch (e: any) {
+      console.error("[Auth] signIn error:", e);
+      return { ok: false, error: e?.message ?? "Sign-in failed" };
+    }
   };
 
   const signOut = async () => {

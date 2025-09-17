@@ -8,7 +8,9 @@ export const supabase = (url && key)
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false, // we will finalize manually on /auth/callback
+        // Let the client consume #access_token automatically if present.
+        // Our callback page will first check existing session and skip manual finalize if already done.
+        detectSessionInUrl: true,
       },
     })
   : null;

@@ -120,7 +120,6 @@ function App() {
                     </PublicLayout>
                   } />
                   <Route path="/auth/callback" element={<AuthCallback />} />
-                  <Route path="/auth/callback" element={<AuthCallback />} />
 
                   {/* Protected Routes */}
                   <Route element={<ProtectedRoute />}>
