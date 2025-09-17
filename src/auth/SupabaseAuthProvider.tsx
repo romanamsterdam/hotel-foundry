@@ -2,6 +2,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+function isValidEmail(s: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 export type AuthUser = {
   id: string;
   email?: string | null;
@@ -93,11 +97,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   }, []);
 
   const signIn = async (email: string) => {
-    if (!supabase) return { ok: false, error: "Supabase not configured" };
     try {
+      const emailStr = (email ?? "").toString().trim();
+      if (!isValidEmail(emailStr)) {
+        return { ok: false, error: "Enter a valid email address." };
+      }
+
+      if (!supabase) {
+        return { ok: false, error: "Supabase not configured" };
+      }
+
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: emailStr,
         options: { emailRedirectTo: `${origin}/auth/callback` },
       });
       if (error) throw error;
