@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase/client";
-
-function parseHashTokens(hash: string) {
-  const qs = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
-  return {
-    access_token: qs.get("access_token") ?? undefined,
-    refresh_token: qs.get("refresh_token") ?? undefined,
-    type: qs.get("type") ?? undefined,
-  };
-}
 
 async function ensureProfileBeta() {
   if (!supabase) return;
@@ -35,7 +26,6 @@ async function ensureProfileBeta() {
 }
 
 export default function AuthCallback() {
-  const { hash } = useLocation();
   const navigate = useNavigate();
   const [msg, setMsg] = useState("Finishing sign-in…");
   const [isError, setIsError] = useState(false);
@@ -43,74 +33,57 @@ export default function AuthCallback() {
   useEffect(() => {
     let mounted = true;
 
-    async function finalize() {
+    async function verifySessionAndRedirect() {
       if (!supabase) {
-        setIsError(true);
-        setMsg("Auth client not initialized.");
+        if (mounted) {
+          setIsError(true);
+          setMsg("Auth client not initialized.");
+        }
         return;
       }
+      
+      const sessionCheck = async (attempts: number): Promise<void> => {
+        if (!mounted) return;
 
-      try {
-        // Check if we already have a session (auto-consumed or previous callback)
-        const { data: sess0 } = await supabase.auth.getSession();
-        if (sess0?.session) {
-          // Clean URL and proceed
-          window.history.replaceState(null, "", "/auth/callback");
-          await ensureProfileBeta();
-          if (!mounted) return;
-          setMsg("Signed in! Redirecting…");
-          setTimeout(() => navigate("/dashboard", { replace: true }), 300);
-          return;
-        }
-
-        // Parse URL for auth data
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
-        const error = url.searchParams.get("error_description");
+        const { data, error } = await supabase.auth.getSession();
 
         if (error) {
-          setIsError(true);
-          setMsg(decodeURIComponent(error));
+          throw new Error("Failed to retrieve session. Please try again.");
+        }
+
+        if (data.session) {
+          await ensureProfileBeta();
+          if (mounted) {
+            setMsg("Signed in! Redirecting…");
+            navigate("/dashboard", { replace: true });
+          }
           return;
         }
 
-        if (code) {
-          // PKCE flow
-          const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exErr) throw exErr;
-          window.history.replaceState(null, "", "/auth/callback");
+        if (attempts > 0) {
+          setTimeout(() => sessionCheck(attempts - 1), 200);
         } else {
-          // Hash tokens flow
-          const { access_token, refresh_token } = parseHashTokens(hash);
-          if (access_token && refresh_token) {
-            const { error: setErr } = await supabase.auth.setSession({ 
-              access_token, 
-              refresh_token 
-            });
-            if (setErr) throw setErr;
-            window.history.replaceState(null, "", "/auth/callback");
-          } else {
-            throw new Error("No auth code or tokens found in callback URL.");
-          }
+          throw new Error("Login session timed out. Please try again.");
         }
+      };
 
-        // Profile upsert is non-blocking
-        await ensureProfileBeta();
-
-        if (!mounted) return;
-        setMsg("Signed in! Redirecting…");
-        setTimeout(() => navigate("/dashboard", { replace: true }), 300);
+      try {
+        await sessionCheck(10); // Try for up to 2 seconds
       } catch (e: any) {
-        if (!mounted) return;
-        console.error("[AuthCallback] finalize error:", e);
-        setIsError(true);
-        setMsg(e?.message ?? "Could not finalize sign-in.");
+        if (mounted) {
+          console.error("[AuthCallback] verifySession error:", e);
+          setIsError(true);
+          setMsg(e?.message ?? "Could not finalize sign-in.");
+        }
       }
     }
 
-    finalize();
-    return () => { mounted = false; };
-  }, [hash, navigate]);
+    verifySessionAndRedirect();
+
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
 
   if (isError) {
     return (
