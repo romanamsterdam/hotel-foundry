@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+// Helper functions remain the same
 function isValidEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
@@ -37,46 +38,20 @@ async function fetchProfile(userId: string) {
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Start as true
 
   useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      if (!supabase) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-      const { data: sessionData } = await supabase.auth.getSession();
-      const session = sessionData?.session ?? null;
-
-      if (session?.user) {
-        const u = session.user;
-        const prof = await fetchProfile(u.id);
-        if (!mounted) return;
-        setUser({
-          id: u.id,
-          email: u.email,
-          name: u.user_metadata?.full_name ?? null,
-          avatarUrl: u.user_metadata?.avatar_url ?? null,
-          role: (prof?.role as AuthUser["role"]) ?? "user",
-          subscription: (prof?.subscription as AuthUser["subscription"]) ?? "free",
-        });
-      } else {
-        setUser(null);
-      }
+    if (!supabase) {
+      setUser(null);
       setLoading(false);
-    })();
+      return;
+    }
 
-    const { data: sub } = supabase?.auth.onAuthStateChange(async (_event, sess) => {
-      const session = sess ?? null;
-      if (!mounted) return;
-
+    // Rely *only* on onAuthStateChange. It fires immediately with the current session.
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const u = session.user;
         const prof = await fetchProfile(u.id);
-        if (!mounted) return;
         setUser({
           id: u.id,
           email: u.email,
@@ -88,11 +63,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       } else {
         setUser(null);
       }
-    }) ?? { unsubscribe: () => {} };
+      // This is critical: set loading to false *after* the first auth check completes.
+      setLoading(false);
+    });
 
     return () => {
-      setTimeout(() => sub?.subscription?.unsubscribe?.(), 0);
-      mounted = false;
+      authListener?.subscription.unsubscribe();
     };
   }, []);
 
@@ -102,11 +78,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       if (!isValidEmail(emailStr)) {
         return { ok: false, error: "Enter a valid email address." };
       }
-
       if (!supabase) {
         return { ok: false, error: "Supabase not configured" };
       }
-
       const origin = window.location.origin;
       const { error } = await supabase.auth.signInWithOtp({
         email: emailStr,
