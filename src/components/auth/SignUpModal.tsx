@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "../../lib/supabase/client";
 import { useAuth } from "../../auth/AuthProvider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -23,9 +24,19 @@ export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await signUp(email, password);
-      if (!res.ok) throw new Error(res.error || "Sign up failed");
-      setIsSuccess(true);
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectTo },
+      });
+      if (error) throw error;
+      // If there's a user but no session, it means they need to confirm their email
+      if (data.user && !data.session) {
+        setIsSuccess(true);
+      } else {
+        setIsSuccess(true);
+      }
     } catch (e: any) {
       setError(e?.message ?? "An unknown error occurred.");
     } finally {

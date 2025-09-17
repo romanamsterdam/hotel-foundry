@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase/client";
+import { useAuth } from "../../auth/AuthProvider";
 
 type Mode = "password" | "magic";
 
 export default function SignInPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth(); // when session appears, redirect
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [mode, setMode] = useState<Mode>("password");
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+  }, [user, navigate]);
 
   const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -22,9 +30,8 @@ export default function SignInPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
       if (error) throw error;
-      // supabase-js will fire onAuthStateChange; router guard should push to /dashboard
+      // onAuthStateChange will fire; useEffect above will redirect
       setMsg("Signed in. Redirecting…");
-      window.location.assign("/dashboard");
     } catch (e: any) {
       setErr(e?.message ?? "Sign-in failed.");
     } finally {
@@ -38,9 +45,11 @@ export default function SignInPage() {
     if (!isEmail(email)) return setErr("Enter a valid email.");
     setBusy(true);
     try {
-      // call your edge function that only sends to confirmed users
-      const { error } = await supabase.functions.invoke("send-magic-link", {
-        body: { email },
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      // if you kept the "can-send-magic" function, check it first; otherwise send directly:
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
       });
       if (error) throw error;
       setMsg("If your email is registered, you will receive a login link.");
