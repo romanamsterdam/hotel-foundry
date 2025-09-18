@@ -24,6 +24,7 @@ import LandingPage from "./routes/LandingPage";
 import SignInPage from "./pages/auth/SignInPage";
 import AuthCallback from "./pages/AuthCallback";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import DashboardPage from "./routes/DashboardPage";
 import CreateDealPage from "./routes/CreateDealPage";
 import UnderwritingHome from "./routes/UnderwritingHome";
@@ -93,6 +94,7 @@ function App() {
                     <Route path="/legal/privacy" element={<PublicLayout><LegalPrivacyPage /></PublicLayout>} />
                     <Route path="/legal/terms" element={<PublicLayout><LegalTermsPage /></PublicLayout>} />
                     <Route path="/signin" element={<PublicLayout><SignInPage /></PublicLayout>} />
+                    <Route path="/auth/forgot" element={<PublicLayout><ForgotPasswordPage /></PublicLayout>} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/auth/reset" element={<ResetPasswordPage />} />
 

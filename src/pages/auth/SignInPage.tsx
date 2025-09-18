@@ -150,7 +150,7 @@ export default function SignInPage() {
       </form>
 
       <div className="mt-3 text-right">
-        <button onClick={onForgotPassword} className="text-sm underline">Forgot password?</button>
+        <a href="/auth/forgot" className="text-sm underline">Forgot password?</a>
       </div>
 
       {msg && <p className="mt-3 text-green-700 text-sm">{msg}</p>}

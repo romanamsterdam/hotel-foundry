@@ -1,70 +1,107 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { getSupabase } from "../../lib/supabase/client";
 
 export default function ResetPasswordPage() {
-  const [pwd, setPwd] = useState("");
-  const [pwd2, setPwd2] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+  const nav = useNavigate();
+  const [stage, setStage] = useState<"opening" | "form" | "done" | "error">("opening");
   const [err, setErr] = useState<string | null>(null);
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
 
-  // When user comes from reset email, Supabase sets a short-lived session; we can now update password
+  // 1) turn the URL code into a session
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      setReady(!!data.session);
+      try {
+        const supabase = getSupabase();
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) throw error;
+        setStage("form");
+      } catch (e:any) {
+        console.error("[reset] exchange error:", e);
+        setErr("This link is invalid or expired. Request a new one.");
+        setStage("error");
+      }
     })();
   }, []);
 
-  async function onSubmit(e: React.FormEvent) {
+  // 2) set a new password
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null); setMsg(null);
-    if (pwd.length < 8) return setErr("Password must be at least 8 characters.");
-    if (pwd !== pwd2) return setErr("Passwords do not match.");
+    setErr(null);
+    if (pw1.length < 8) return setErr("Password must be at least 8 characters.");
+    if (pw1 !== pw2) return setErr("Passwords do not match.");
+
     setBusy(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: pwd });
+      const supabase = getSupabase();
+      const { error } = await supabase.auth.updateUser({ password: pw1 });
       if (error) throw error;
-      setMsg("Password updated. You can close this tab and sign in.");
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to update password.");
+      setStage("done");
+      setTimeout(() => nav("/signin"), 1200);
+    } catch (e:any) {
+      console.error("[reset] updateUser error:", e);
+      setErr(e?.message ?? "Could not set the new password.");
     } finally {
       setBusy(false);
     }
+  };
+
+  if (stage === "opening") {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center text-slate-600">
+        <div className="flex items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
+          Opening reset session…
+        </div>
+      </div>
+    );
   }
 
+  if (stage === "error") {
+    return (
+      <div className="mx-auto max-w-md py-10">
+        <h1 className="mb-2 text-2xl font-semibold">Reset password</h1>
+        <p className="text-red-600">{err}</p>
+        <a className="mt-4 inline-block underline" href="/auth/forgot">Request a new link</a>
+      </div>
+    );
+  }
+
+  if (stage === "done") {
+    return (
+      <div className="mx-auto max-w-md py-10">
+        <h1 className="mb-2 text-2xl font-semibold">Password updated</h1>
+        <p className="text-slate-600">Redirecting to sign in…</p>
+      </div>
+    );
+  }
+
+  // stage === "form"
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">Reset password</h1>
-      {!ready && (
-        <p className="text-sm text-slate-600">
-          Opening reset session… If this page was not opened from a reset email, request a new link.
-        </p>
-      )}
-      {ready && (
-        <form onSubmit={onSubmit} className="space-y-3">
-          <input
-            type="password"
-            placeholder="New password"
-            className="w-full border rounded px-3 py-2"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Repeat new password"
-            className="w-full border rounded px-3 py-2"
-            value={pwd2}
-            onChange={(e) => setPwd2(e.target.value)}
-          />
-          <button type="submit" disabled={busy} className="w-full rounded bg-black text-white py-2">
-            {busy ? "Updating…" : "Update password"}
-          </button>
-        </form>
-      )}
-      {msg && <p className="mt-3 text-green-700 text-sm">{msg}</p>}
-      {err && <p className="mt-3 text-red-600 text-sm">{err}</p>}
+    <div className="mx-auto max-w-md py-10">
+      <h1 className="mb-2 text-2xl font-semibold">Choose a new password</h1>
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <input
+          type="password"
+          className="w-full rounded border px-3 py-2"
+          placeholder="New password"
+          value={pw1}
+          onChange={(e)=>setPw1(e.target.value)}
+        />
+        <input
+          type="password"
+          className="w-full rounded border px-3 py-2"
+          placeholder="Repeat new password"
+          value={pw2}
+          onChange={(e)=>setPw2(e.target.value)}
+        />
+        <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white" disabled={busy}>
+          {busy ? "Saving…" : "Set new password"}
+        </button>
+        {err && <p className="text-sm text-red-600">{err}</p>}
+      </form>
     </div>
   );
 }
