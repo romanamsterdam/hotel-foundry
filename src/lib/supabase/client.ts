@@ -10,7 +10,7 @@ export function getSupabase() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false, // we handle it in AuthCallback via exchangeCodeForSession
+      detectSessionInUrl: false, // important: no auto exchange
     },
   });
   return _client;
