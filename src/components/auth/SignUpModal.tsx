@@ -1,106 +1,254 @@
-import { useState } from "react";
-import { supabase } from "../../lib/supabase/client";
-import { useAuth } from "../../auth/AuthProvider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import * as React from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { getSupabase } from "../../lib/supabase/client";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Alert, AlertDescription } from "../ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Switch } from "../ui/switch";
+import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
+
+type ClientType = "broker" | "investor" | "operator" | "other";
 
 type SignUpModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  planId?: string;
+  planName?: string;
 };
 
-export default function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
-  const { signUp } = useAuth(); // <-- only once
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+export default function SignUpModal({ isOpen, onClose, planId, planName }: SignUpModalProps) {
+  const supabase = getSupabase();
+  const nav = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [fullName, setFullName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [clientType, setClientType] = React.useState<ClientType | "">("");
+  const [pw1, setPw1] = React.useState("");
+  const [pw2, setPw2] = React.useState("");
+  const [agreeTerms, setAgreeTerms] = React.useState(false);
+  const [ackRisk, setAckRisk] = React.useState(false);
+
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [msg, setMsg] = React.useState<string | null>(null);
+
+  const cleanEmail = email.trim().toLowerCase();
+  const validEmail = /\S+@\S+\.\S+/.test(cleanEmail);
+  const pwOk = pw1.length >= 8 && pw1 === pw2;
+  const canSubmit =
+    fullName.trim().length > 1 &&
+    validEmail &&
+    !!clientType &&
+    pwOk &&
+    agreeTerms &&
+    ackRisk &&
+    !busy;
+
+  // Reset form when modal opens/closes
+  React.useEffect(() => {
+    if (isOpen) {
+      setFullName("");
+      setEmail("");
+      setClientType("");
+      setPw1("");
+      setPw2("");
+      setAgreeTerms(false);
+      setAckRisk(false);
+      setErr(null);
+      setMsg(null);
+    }
+  }, [isOpen]);
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+    setErr(null);
+    setMsg(null);
+    if (!canSubmit) return;
+
+    setBusy(true);
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      // 1) Create auth user
       const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: redirectTo },
+        email: cleanEmail,
+        password: pw1,
+        options: {
+          data: { 
+            full_name: fullName.trim(), 
+            client_type: clientType,
+            plan_id: planId || "beta"
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) throw error;
-      // If there's a user but no session, it means they need to confirm their email
+
+      // 2) Enrich profiles row (trigger creates it; we update additional columns)
+      const userId = data.user?.id;
+      if (userId) {
+        const { error: upErr } = await supabase
+          .from("profiles")
+          .update({
+            full_name: fullName.trim(),
+            client_type: clientType,
+            plan_id: planId || "beta",
+            accepted_terms_at: new Date().toISOString(),
+            risk_acknowledged: true,
+          })
+          .eq("id", userId);
+        if (upErr) {
+          console.warn("[signup] profile update warning:", upErr);
+        }
+      }
+
       if (data.user && !data.session) {
-        setIsSuccess(true);
+        setMsg("Account created! Please check your inbox to confirm your email address.");
       } else {
-        setIsSuccess(true);
+        setMsg("Account created successfully! Redirecting to dashboard...");
+        setTimeout(() => {
+          onClose();
+          nav("/dashboard");
+        }, 1500);
       }
     } catch (e: any) {
-      setError(e?.message ?? "An unknown error occurred.");
+      setErr(e?.message ?? "Could not create the account.");
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
   };
 
-  const handleClose = () => {
-    setEmail("");
-    setPassword("");
-    setError(null);
-    setIsSubmitting(false);
-    setIsSuccess(false);
-    onClose();
-  };
-
-  if (isSuccess) {
-    return (
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Check your email</DialogTitle>
-            <DialogDescription>
-              We’ve sent a confirmation link to <strong>{email}</strong>. Click it to complete your registration.
-            </DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Get Beta Access to Hotel Foundry</DialogTitle>
-          <DialogDescription>Create an account to start modeling your first hotel deal.</DialogDescription>
+          <DialogTitle>Join Hotel Foundry</DialogTitle>
+          <DialogDescription>
+            Get started with the <span className="font-medium text-emerald-700">{planName || "Beta-tester"}</span> plan.
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={isSubmitting}
-          />
-          <Input
-            type="password"
-            placeholder="Password (min. 8 characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isSubmitting}
-          />
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+
+        <form onSubmit={onSubmit} className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Full Name *</label>
+            <Input
+              placeholder="Your full name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email Address *</label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value.trim())}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Type of Client *</label>
+            <Select value={clientType} onValueChange={(v: any) => setClientType(v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select your client type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="broker">Broker</SelectItem>
+                <SelectItem value="investor">Investor</SelectItem>
+                <SelectItem value="operator">Operator</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password *</label>
+              <Input
+                type="password"
+                placeholder="Minimum 8 characters"
+                value={pw1}
+                onChange={(e) => setPw1(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirm Password *</label>
+              <Input
+                type="password"
+                placeholder="Repeat password"
+                value={pw2}
+                onChange={(e) => setPw2(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-3">
+            <label className="flex items-start gap-2">
+              <Switch checked={agreeTerms} onCheckedChange={(v) => setAgreeTerms(!!v)} />
+              <span className="text-sm">
+                I agree to the{" "}
+                <a className="underline" href="/legal/terms" target="_blank" rel="noreferrer">Terms &amp; Conditions</a>{" "}
+                and{" "}
+                <a className="underline" href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
+              </span>
+            </label>
+
+            <label className="flex items-start gap-2">
+              <Switch checked={ackRisk} onCheckedChange={(v) => setAckRisk(!!v)} />
+              <span className="text-sm">
+                I acknowledge the platform is indicative, may contain errors, and should not be solely relied upon for investment decisions.
+              </span>
+            </label>
+          </div>
+
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          {!pwOk && (pw1 || pw2) && (
+            <p className="text-xs text-amber-700">Passwords must match and be at least 8 characters.</p>
           )}
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Creating Account..." : "Create Account"}
+          {msg && <p className="text-sm text-emerald-700">{msg}</p>}
+
+          <Button type="submit" disabled={!canSubmit} className="w-full">
+            {busy ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> 
+                Creating Account...
+              </span>
+            ) : (
+              "Create Account"
+            )}
           </Button>
+
+          <p className="mt-2 text-sm text-slate-600 text-center">
+            Already have an account?{" "}
+            <button 
+              type="button"
+              onClick={() => {
+                onClose();
+                nav("/signin");
+              }}
+              className="underline hover:text-slate-900"
+            >
+              Sign in
+            </button>
+          </p>
         </form>
+
+        <div className="mt-6 rounded-md border bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+          <strong>Important Disclaimer.</strong> Hotel Foundry provides analysis tools for educational purposes.
+          Projections and outputs are estimates and may not reflect actual performance. Always perform independent due
+          diligence and consult qualified advisors. You are solely responsible for your decisions.
+        </div>
       </DialogContent>
     </Dialog>
   );
