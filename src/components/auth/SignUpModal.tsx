@@ -1,9 +1,15 @@
 import * as React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../../lib/supabase/client";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Switch } from "../ui/switch";
 import { Loader2 } from "lucide-react";
 import {
@@ -23,7 +29,12 @@ type SignUpModalProps = {
   planName?: string;
 };
 
-export default function SignUpModal({ isOpen, onClose, planId, planName }: SignUpModalProps) {
+export default function SignUpModal({
+  isOpen,
+  onClose,
+  planId,
+  planName,
+}: SignUpModalProps) {
   const supabase = getSupabase();
   const nav = useNavigate();
 
@@ -51,45 +62,42 @@ export default function SignUpModal({ isOpen, onClose, planId, planName }: SignU
     ackRisk &&
     !busy;
 
-  // Reset form when modal opens/closes
   React.useEffect(() => {
-    if (isOpen) {
-      setFullName("");
-      setEmail("");
-      setClientType("");
-      setPw1("");
-      setPw2("");
-      setAgreeTerms(false);
-      setAckRisk(false);
-      setErr(null);
-      setMsg(null);
-    }
+    if (!isOpen) return;
+    setFullName("");
+    setEmail("");
+    setClientType("");
+    setPw1("");
+    setPw2("");
+    setAgreeTerms(false);
+    setAckRisk(false);
+    setErr(null);
+    setMsg(null);
   }, [isOpen]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null);
-    setMsg(null);
     if (!canSubmit) return;
 
+    setErr(null);
+    setMsg(null);
     setBusy(true);
+
     try {
-      // 1) Create auth user
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password: pw1,
         options: {
-          data: { 
-            full_name: fullName.trim(), 
+          data: {
+            full_name: fullName.trim(),
             client_type: clientType,
-            plan_id: planId || "beta"
+            plan_id: planId || "beta",
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
 
-      // 2) Enrich profiles row (trigger creates it; we update additional columns)
       const userId = data.user?.id;
       if (userId) {
         const { error: upErr } = await supabase
@@ -102,19 +110,17 @@ export default function SignUpModal({ isOpen, onClose, planId, planName }: SignU
             risk_acknowledged: true,
           })
           .eq("id", userId);
-        if (upErr) {
-          console.warn("[signup] profile update warning:", upErr);
-        }
+        if (upErr) console.warn("[signup] profile update warning:", upErr);
       }
 
       if (data.user && !data.session) {
         setMsg("Account created! Please check your inbox to confirm your email address.");
       } else {
-        setMsg("Account created successfully! Redirecting to dashboard...");
+        setMsg("Account created successfully! Redirecting to dashboard…");
         setTimeout(() => {
           onClose();
           nav("/dashboard");
-        }, 1500);
+        }, 1200);
       }
     } catch (e: any) {
       setErr(e?.message ?? "Could not create the account.");
@@ -125,129 +131,138 @@ export default function SignUpModal({ isOpen, onClose, planId, planName }: SignU
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl md:max-w-2xl px-6 py-6">
-        <DialogHeader>
-          <DialogTitle>Join Hotel Foundry</DialogTitle>
-          <DialogDescription>
-            Get started with the <span className="font-medium text-emerald-700">{planName || "Beta-tester"}</span> plan.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={onSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Full Name *</label>
-            <Input
-              placeholder="Your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
+      <DialogContent className="sm:max-w-xl md:max-w-2xl p-0">
+        <div className="flex max-h-[85vh] flex-col">
+          {/* Header */}
+          <div className="px-6 pt-6">
+            <DialogHeader>
+              <DialogTitle>Join Hotel Foundry</DialogTitle>
+              <DialogDescription>
+                Get started with the{" "}
+                <span className="font-medium text-emerald-700">
+                  {planName || "Beta-tester"}
+                </span>{" "}
+                plan.
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email Address *</label>
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value.trim())}
-              required
-            />
+          {/* Scrollable body (form + disclaimer) */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 pt-2">
+            <form id="signup_form" onSubmit={onSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name *</label>
+                <Input
+                  placeholder="Your full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address *</label>
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Type of Client *</label>
+                <Select value={clientType} onValueChange={(v: any) => setClientType(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your client type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="broker">Broker</SelectItem>
+                    <SelectItem value="investor">Investor</SelectItem>
+                    <SelectItem value="operator">Operator</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password *</label>
+                  <Input
+                    type="password"
+                    placeholder="Minimum 8 characters"
+                    value={pw1}
+                    onChange={(e) => setPw1(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Confirm Password *</label>
+                  <Input
+                    type="password"
+                    placeholder="Repeat password"
+                    value={pw2}
+                    onChange={(e) => setPw2(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-md border p-3">
+                <label className="flex items-start gap-2">
+                  <Switch checked={agreeTerms} onCheckedChange={(v) => setAgreeTerms(!!v)} />
+                  <span className="text-sm">
+                    I agree to the{" "}
+                    <a className="underline" href="/legal/terms" target="_blank" rel="noreferrer">
+                      Terms &amp; Conditions
+                    </a>{" "}
+                    and{" "}
+                    <a className="underline" href="/legal/privacy" target="_blank" rel="noreferrer">
+                      Privacy Policy
+                    </a>.
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-2">
+                  <Switch checked={ackRisk} onCheckedChange={(v) => setAckRisk(!!v)} />
+                  <span className="text-sm">
+                    I acknowledge the platform is indicative, may contain errors, and should not be
+                    solely relied upon for investment decisions.
+                  </span>
+                </label>
+              </div>
+
+              {err && <p className="text-sm text-red-600">{err}</p>}
+              {!pwOk && (pw1 || pw2) && (
+                <p className="text-xs text-amber-700">
+                  Passwords must match and be at least 8 characters.
+                </p>
+              )}
+              {msg && <p className="text-sm text-emerald-700">{msg}</p>}
+
+              <div className="mt-4 rounded-md border bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                <strong>Important Disclaimer.</strong> Hotel Foundry provides analysis tools for
+                educational purposes. Projections and outputs are estimates and may not reflect
+                actual performance. Always perform independent due diligence and consult qualified
+                advisors. You are solely responsible for your decisions.
+              </div>
+            </form>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Type of Client *</label>
-            <Select value={clientType} onValueChange={(v: any) => setClientType(v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your client type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="broker">Broker</SelectItem>
-                <SelectItem value="investor">Investor</SelectItem>
-                <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Sticky footer */}
+          <div className="border-t bg-white px-6 py-4">
+            <Button type="submit" form="signup_form" className="w-full" disabled={!canSubmit}>
+              {busy ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating Account…
+                </span>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
           </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password *</label>
-              <Input
-                type="password"
-                placeholder="Minimum 8 characters"
-                value={pw1}
-                onChange={(e) => setPw1(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Confirm Password *</label>
-              <Input
-                type="password"
-                placeholder="Repeat password"
-                value={pw2}
-                onChange={(e) => setPw2(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-md border p-3">
-            <label className="flex items-start gap-2">
-              <Switch checked={agreeTerms} onCheckedChange={(v) => setAgreeTerms(!!v)} />
-              <span className="text-sm">
-                I agree to the{" "}
-                <a className="underline" href="/legal/terms" target="_blank" rel="noreferrer">Terms &amp; Conditions</a>{" "}
-                and{" "}
-                <a className="underline" href="/legal/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
-              </span>
-            </label>
-
-            <label className="flex items-start gap-2">
-              <Switch checked={ackRisk} onCheckedChange={(v) => setAckRisk(!!v)} />
-              <span className="text-sm">
-                I acknowledge the platform is indicative, may contain errors, and should not be solely relied upon for investment decisions.
-              </span>
-            </label>
-          </div>
-
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          {!pwOk && (pw1 || pw2) && (
-            <p className="text-xs text-amber-700">Passwords must match and be at least 8 characters.</p>
-          )}
-          {msg && <p className="text-sm text-emerald-700">{msg}</p>}
-
-          <Button type="submit" disabled={!canSubmit} className="w-full">
-            {busy ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> 
-                Creating Account...
-              </span>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
-
-          <p className="mt-2 text-sm text-slate-600 text-center">
-            Already have an account?{" "}
-            <button 
-              type="button"
-              onClick={() => {
-                onClose();
-                nav("/signin");
-              }}
-              className="underline hover:text-slate-900"
-            >
-              Sign in
-            </button>
-          </p>
-        </form>
-
-        <div className="mt-6 rounded-md border bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-          <strong>Important Disclaimer.</strong> Hotel Foundry provides analysis tools for educational purposes.
-          Projections and outputs are estimates and may not reflect actual performance. Always perform independent due
-          diligence and consult qualified advisors. You are solely responsible for your decisions.
         </div>
       </DialogContent>
     </Dialog>
