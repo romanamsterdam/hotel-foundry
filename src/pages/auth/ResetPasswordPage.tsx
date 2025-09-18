@@ -12,6 +12,7 @@ export default function ResetPasswordPage() {
   const [err, setErr] = useState<string | null>(null);
   const [exchanging, setExchanging] = useState(false);
   const [useCode, setUseCode] = useState(false); // show OTP form
+  const [authed, setAuthed] = useState(false); // NEW: we only allow password change when true
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [pw1, setPw1] = useState("");
@@ -25,11 +26,20 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
       if (error) throw error;
+      // After successful exchange, check session
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setErr("Could not establish session. Please try again or use the 6-digit code.");
+        setAuthed(false);
+        return;
+      }
+      setAuthed(true);
       // success: scroll to password form
       document.getElementById("pw-form")?.scrollIntoView({ behavior: "smooth" });
     } catch (e: any) {
       setErr("This link is invalid/expired or was pre-opened by a mail scanner. You can continue with the 6-digit code from the email.");
       setUseCode(true);
+      setAuthed(false);
     } finally {
       setExchanging(false);
     }
@@ -39,22 +49,35 @@ export default function ResetPasswordPage() {
   const onVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (!/\S+@\S+\.\S+/.test(email)) return setErr("Enter a valid email.");
-    if (!/^\d{6}$/.test(code)) return setErr("Enter the 6-digit code.");
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim().replace(/\s+/g, "");
+
+    if (!/\S+@\S+\.\S+/.test(cleanEmail)) return setErr("Enter a valid email.");
+    if (!/^\d{6}$/.test(cleanCode)) return setErr("Enter the 6-digit code.");
 
     setBusy(true);
     try {
       const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
+        email: cleanEmail,
+        token: cleanCode,
         type: "recovery", // correct type for password reset
       });
       if (error) throw error;
+
+      // After verifyOtp we must have a session
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setErr("Could not open a session. The code may be expired—request a new reset email.");
+        setAuthed(false);
+        return;
+      }
+      setAuthed(true);
       // session established → show password form
       document.getElementById("pw-form")?.scrollIntoView({ behavior: "smooth" });
-      setUseCode(false);
     } catch (e:any) {
-      setErr(e?.message ?? "Invalid or expired code.");
+      setAuthed(false);
+      setErr(e?.message ?? "Invalid or expired code. Request a new reset email.");
     } finally {
       setBusy(false);
     }
@@ -64,6 +87,11 @@ export default function ResetPasswordPage() {
   const onSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+
+    if (!authed) {
+      setErr("Auth session missing. Verify your 6-digit code again or request a new reset email.");
+      return;
+    }
     if (pw1.length < 8) return setErr("Password must be at least 8 characters.");
     if (pw1 !== pw2) return setErr("Passwords do not match.");
 
@@ -71,7 +99,9 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: pw1 });
       if (error) throw error;
-      nav("/signin", { replace: true });
+      // optional: clear state
+      setPw1(""); setPw2("");
+      setTimeout(() => nav("/signin", { replace: true }), 800);
     } catch (e:any) {
       setErr(e?.message ?? "Could not set the new password.");
     } finally {
@@ -86,7 +116,7 @@ export default function ResetPasswordPage() {
       {hasLinkCode && !useCode && (
         <div className="rounded border p-4">
           <p className="text-sm text-slate-700 mb-3">
-            This page was opened from your reset email. Click continue to open a secure session.
+            Click to continue with the reset link from your email.
           </p>
           <button
             onClick={onContinue}
@@ -125,9 +155,14 @@ export default function ResetPasswordPage() {
             placeholder="New password" value={pw1} onChange={(e)=>setPw1(e.target.value)} />
           <input type="password" className="w-full rounded border px-3 py-2"
             placeholder="Repeat new password" value={pw2} onChange={(e)=>setPw2(e.target.value)} />
-          <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white" disabled={busy}>
-            {busy ? "Saving…" : "Set new password"}
+          <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-50" disabled={busy || !authed}>
+            {busy ? "Setting password…" : "Set new password"}
           </button>
+          {!authed && (
+            <p className="mt-2 text-xs text-slate-500">
+              Verify your 6-digit code first to enable password change.
+            </p>
+          )}
         </form>
       </div>
 
