@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabase/client";
+import { getSupabase } from "../../lib/supabase/client";
 import { useAuth } from "../../auth/AuthProvider";
+
+// Helper to send magic link with correct origin
+async function sendMagicLink(email: string) {
+  const supabase = getSupabase();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+  if (error) throw error;
+}
 
 type Mode = "password" | "magic";
 
@@ -14,12 +27,19 @@ export default function SignInPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     if (user) navigate("/dashboard", { replace: true });
   }, [user, navigate]);
 
-  const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  function isEmail(v: string) {
+    return /\S+@\S+\.\S+/.test(v);
+  }
+
+  function isEmail(v: string) {
+    return /\S+@\S+\.\S+/.test(v);
+  }
 
   async function onPasswordLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +48,7 @@ export default function SignInPage() {
     if (!pwd) return setErr("Enter your password.");
     setBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+      const { error } = await getSupabase().auth.signInWithPassword({ email, password: pwd });
       if (error) throw error;
       // onAuthStateChange will fire; useEffect above will redirect
       setMsg("Signed in. Redirecting…");
@@ -39,37 +59,39 @@ export default function SignInPage() {
     }
   }
 
-  async function onMagicLink(e: React.FormEvent) {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr(null); setMsg(null);
-    if (!isEmail(email)) return setErr("Enter a valid email.");
+    setErr(null);
+
+    if (!isEmail(email)) {
+      setErr("Enter a valid email.");
+      return;
+    }
+
     setBusy(true);
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      // if you kept the "can-send-magic" function, check it first; otherwise send directly:
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
-      });
-      if (error) throw error;
+      await sendMagicLink(email);
+      setSent(true);
       setMsg("If your email is registered, you will receive a login link.");
-    } catch (e: any) {
-      setErr(e?.message ?? "Could not send link.");
+    } catch (err: any) {
+      console.error("[sign-in] sendMagicLink error:", err);
+      setErr(err?.message ?? "Could not send the magic link. Please try again.");
     } finally {
       setBusy(false);
     }
-  }
+  };
 
   async function onForgotPassword() {
     setErr(null); setMsg(null);
     if (!isEmail(email)) return setErr("Enter your email first.");
     try {
-      const redirectTo = `${window.location.origin}/auth/reset`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      const redirectTo = `${window.location.origin}/auth/reset`; // <-- consistent origin fix
+      const { error } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setMsg("Password reset email sent (if the account exists).");
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to send reset email.");
+      console.error("[sign-in] resetPassword error:", e);
+      setErr(e?.message ?? "Could not send the reset email. Please try again.");
     }
   }
 
@@ -92,7 +114,7 @@ export default function SignInPage() {
         </button>
       </div>
 
-      <form onSubmit={mode==="password" ? onPasswordLogin : onMagicLink} className="space-y-3">
+      <form onSubmit={mode==="password" ? onPasswordLogin : onSubmit} className="space-y-3">
         <input
           type="email"
           placeholder="email@domain.com"
@@ -117,7 +139,7 @@ export default function SignInPage() {
           disabled={busy}
           className="w-full rounded bg-black text-white py-2"
         >
-          {busy ? "Please wait…" : (mode === "password" ? "Sign in" : "Send magic link")}
+          {busy ? "Please wait..." : (mode === "password" ? "Sign in" : "Send magic link")}
         </button>
       </form>
 

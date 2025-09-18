@@ -1,13 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL!;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+let _client: any = null;
 
-export const supabase = createClient(url, anon, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false, // we handle it on /auth/callback
-    flowType: "pkce",
-  },
-});
+export function getSupabase() {
+  if (_client) return _client;
+  const url = import.meta.env.VITE_SUPABASE_URL!;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+  _client = createClient(url, anon, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false, // we handle it in AuthCallback via exchangeCodeForSession
+    },
+  });
+  return _client;
+}
+
+export const supabase = getSupabase();
