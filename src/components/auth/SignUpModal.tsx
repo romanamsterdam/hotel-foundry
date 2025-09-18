@@ -125,7 +125,7 @@ export default function SignUpModal({ isOpen, onClose, planId, planName }: SignU
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl px-6 py-6">
         <DialogHeader>
           <DialogTitle>Join Hotel Foundry</DialogTitle>
           <DialogDescription>
