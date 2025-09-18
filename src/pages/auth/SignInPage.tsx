@@ -3,8 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../../lib/supabase/client";
 import { useAuth } from "../../auth/AuthProvider";
 
+// Feature flag for Magic Link (default off)
+const FEATURE_MAGICLINK = import.meta.env.VITE_FEATURE_MAGICLINK === "true";
+
 // Helper to send magic link with correct origin
 async function sendMagicLink(email: string) {
+  if (!FEATURE_MAGICLINK) return; // guard: do nothing when disabled
   const supabase = getSupabase();
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -23,7 +27,7 @@ export default function SignInPage() {
   const { user } = useAuth(); // when session appears, redirect
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
-  const [mode, setMode] = useState<Mode>("password");
+  const [mode, setMode] = useState<Mode>("password"); // always default to password
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -99,20 +103,22 @@ export default function SignInPage() {
     <div className="max-w-md mx-auto p-6">
       <h1 className="text-xl font-semibold mb-4">Sign in</h1>
 
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => setMode("password")}
-          className={`px-3 py-1 rounded ${mode==="password" ? "bg-black text-white" : "bg-slate-200"}`}
-        >
-          Password
-        </button>
-        <button
-          onClick={() => setMode("magic")}
-          className={`px-3 py-1 rounded ${mode==="magic" ? "bg-black text-white" : "bg-slate-200"}`}
-        >
-          Magic link
-        </button>
-      </div>
+      {FEATURE_MAGICLINK && (
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => setMode("password")}
+            className={`px-3 py-1 rounded ${mode==="password" ? "bg-black text-white" : "bg-slate-200"}`}
+          >
+            Password
+          </button>
+          <button
+            onClick={() => setMode("magic")}
+            className={`px-3 py-1 rounded ${mode==="magic" ? "bg-black text-white" : "bg-slate-200"}`}
+          >
+            Magic link
+          </button>
+        </div>
+      )}
 
       <form onSubmit={mode==="password" ? onPasswordLogin : onSubmit} className="space-y-3">
         <input
@@ -123,7 +129,7 @@ export default function SignInPage() {
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
         />
-        {mode === "password" && (
+        {(mode === "password" || !FEATURE_MAGICLINK) && (
           <input
             type="password"
             placeholder="Your password"
@@ -139,7 +145,7 @@ export default function SignInPage() {
           disabled={busy}
           className="w-full rounded bg-black text-white py-2"
         >
-          {busy ? "Please wait..." : (mode === "password" ? "Sign in" : "Send magic link")}
+          {busy ? "Please wait..." : (mode === "password" || !FEATURE_MAGICLINK ? "Sign in" : "Send magic link")}
         </button>
       </form>
 
