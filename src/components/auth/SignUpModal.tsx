@@ -131,8 +131,10 @@ export default function SignUpModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      {/* Important: remove DialogContent's own scrolling and make our inner wrapper the scroller */}
       <DialogContent className="sm:max-w-xl md:max-w-2xl p-0">
-        <div className="flex max-h-[85vh] flex-col">
+        {/* This wrapper is the only scroll container; sticky footer works against it */}
+        <div className="max-h-[85vh] overflow-y-auto">
           {/* Header */}
           <div className="px-6 pt-6">
             <DialogHeader>
@@ -147,8 +149,8 @@ export default function SignUpModal({
             </DialogHeader>
           </div>
 
-          {/* Scrollable body (form + disclaimer) */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 pt-2">
+          {/* Body */}
+          <div className="px-6 pb-4 pt-2">
             <form id="signup_form" onSubmit={onSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Full Name *</label>
@@ -241,27 +243,28 @@ export default function SignUpModal({
               )}
               {msg && <p className="text-sm text-emerald-700">{msg}</p>}
 
+              {/* Disclaimer */}
               <div className="mt-4 rounded-md border bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
                 <strong>Important Disclaimer.</strong> Hotel Foundry provides analysis tools for
                 educational purposes. Projections and outputs are estimates and may not reflect
                 actual performance. Always perform independent due diligence and consult qualified
                 advisors. You are solely responsible for your decisions.
               </div>
-            </form>
-          </div>
 
-          {/* Sticky footer */}
-          <div className="border-t bg-white px-6 py-4">
-            <Button type="submit" form="signup_form" className="w-full" disabled={!canSubmit}>
-              {busy ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating Account…
-                </span>
-              ) : (
-                "Create Account"
-              )}
-            </Button>
+              {/* Sticky footer INSIDE the scroller (works with position: sticky) */}
+              <div className="sticky bottom-0 z-10 mt-4 border-t bg-white px-0 py-4">
+                <Button type="submit" form="signup_form" className="w-full" disabled={!canSubmit}>
+                  {busy ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Creating Account…
+                    </span>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       </DialogContent>
