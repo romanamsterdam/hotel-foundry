@@ -1,3 +1,5 @@
-// Single source of truth: re-export Supabase provider + hook.
-// If you ever add a mock provider again, switch the exports here.
-export { AuthProvider, useAuth } from "./SupabaseAuthProvider";
+// Single source of truth for consumers:
+// import { AuthProvider, useAuth } from "@/auth/AuthProvider";
+
+export { default as AuthProvider } from "./SupabaseAuthProvider";
+export { useAuth } from "./useAuth";
