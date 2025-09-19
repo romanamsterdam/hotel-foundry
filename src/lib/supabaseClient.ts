@@ -1,2 +1,2 @@
-// Re-export from the singleton client for backward compatibility
-export { supabase } from "./supabase/client";
+// Backward-compat re-exports (some code still imports from here)
+export { supabase, getSupabase } from "./supabase/client";

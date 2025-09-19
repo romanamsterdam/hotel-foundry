@@ -1,26 +1,39 @@
-import { createClient } from "@supabase/supabase-js";
-// 👇 CORRECTED: Import the actual exported variables from your env file.
-import { env } from "../../config/env";
+// Unified Supabase client exports for browser apps
+// - Named export:   supabase (singleton)
+// - Named export:   getSupabase() (factory returning the same singleton)
 
-let supabase: ReturnType<typeof createClient>;
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export function getSupabase() {
-  if (supabase) return supabase;
+// We keep a module-scoped singleton to avoid multiple instances in HMR/dev.
+let _client: SupabaseClient | undefined;
 
-  // 👇 And use the correctly named variables here.
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    throw new Error("SUPABASE_MISSING_CONFIG");
+export function getSupabase(): SupabaseClient {
+  if (_client) return _client;
+
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+  // Fail fast in prod if envs are missing. In your app, the data-source guard
+  // should catch this and render a friendly card — this throw keeps types honest.
+  if (!url || !anon) {
+    throw new Error(
+      "[supabase/client] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY"
+    );
   }
 
-  supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  _client = createClient(url, anon, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // This setting is crucial for our new callback page to work correctly.
-      detectSessionInUrl: false, 
+      detectSessionInUrl: false,
       flowType: "pkce",
+      multiTab: true,
+      storageKey: "hf-auth-v1",
     },
   });
 
-  return supabase;
+  return _client;
 }
+
+// Provide a named singleton for sites that import { supabase } directly.
+export const supabase = getSupabase();
