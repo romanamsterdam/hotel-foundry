@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
@@ -12,21 +12,15 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     const emailTrimmed = email.trim();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/auth/reset`;
 
     try {
-      // 1) Attempt with explicit redirectTo
-      let { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, { redirectTo });
-      if (error) {
-        // 2) If backend complains (sometimes as 500), retry without redirectTo
-        const retry = await supabase.auth.resetPasswordForEmail(emailTrimmed);
-        if (retry.error) throw retry.error;
-      }
+      const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed);
+      if (error) throw error;
       toast.success("Password reset link sent. Check your email.");
     } catch (err: any) {
-      const errorMsg = err?.message ?? "Could not send reset email";
-      setError(errorMsg);
-      toast.error(errorMsg);
+      const msg = err?.message ?? "Could not send reset email";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
