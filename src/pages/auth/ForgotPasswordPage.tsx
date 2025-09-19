@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
-import { useToast } from "../../components/ui/toast";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
-  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -12,17 +11,22 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const emailTrimmed = email.trim();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/auth/reset`;
+
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        {
-          redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
-        }
-      );
-      if (error) throw error;
+      // 1) Attempt with explicit redirectTo
+      let { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, { redirectTo });
+      if (error) {
+        // 2) If backend complains (sometimes as 500), retry without redirectTo
+        const retry = await supabase.auth.resetPasswordForEmail(emailTrimmed);
+        if (retry.error) throw retry.error;
+      }
       toast.success("Password reset link sent. Check your email.");
     } catch (err: any) {
-      setError(err?.message ?? "Failed to send reset email");
+      const errorMsg = err?.message ?? "Could not send reset email";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
