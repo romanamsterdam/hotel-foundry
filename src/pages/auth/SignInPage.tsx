@@ -52,10 +52,9 @@ export default function SignInPage() {
     if (!pwd) return setErr("Enter your password.");
     setBusy(true);
     try {
-      const { error } = await getSupabase().auth.signInWithPassword({ email, password: pwd });
-      if (error) throw error;
-      // onAuthStateChange will fire; useEffect above will redirect
+      await signInWithPassword(email, pwd);
       setMsg("Signed in. Redirecting…");
+      navigate("/dashboard");
     } catch (e: any) {
       setErr(e?.message ?? "Sign-in failed.");
     } finally {
@@ -66,6 +65,10 @@ export default function SignInPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+    if (!isEmail(email)) {
+      setErr("Enter a valid email.");
+      return;
+    }
 
     if (!isEmail(email)) {
       setErr("Enter a valid email.");
@@ -74,7 +77,15 @@ export default function SignInPage() {
 
     setBusy(true);
     try {
-      await sendMagicLink(email);
+      const supabase = getSupabase();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { 
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          shouldCreateUser: true 
+        },
+      });
+      if (error) throw error;
       setSent(true);
       setMsg("If your email is registered, you will receive a login link.");
     } catch (err: any) {

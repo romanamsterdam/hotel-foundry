@@ -1,5 +1,5 @@
-// src/auth/SupabaseAuthProvider.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import type { AuthUser as TAuthUser } from "../types/auth";
 
@@ -10,11 +10,13 @@ function isValidEmail(s: string) {
 export type AuthUser = TAuthUser;
 
 type AuthContextValue = {
+  session: Session | null;
   user: AuthUser | null;
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   signUp: (email: string, password: string) => Promise<{ ok: boolean; error?: string; requiresConfirmation?: boolean }>;
-  signIn: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -33,11 +35,11 @@ async function fetchProfile(userId: string) {
   return data ?? null;
 }
 
-function mergeUser(sessionUser: any, profile: any): AuthUser {
+function mergeUser(sessionUser: User, profile: any): AuthUser {
   return {
     id: sessionUser.id,
     email: sessionUser.email ?? profile?.email ?? undefined,
-    name: sessionUser.user_metadata?.name ?? undefined,
+    name: sessionUser.user_metadata?.full_name ?? sessionUser.user_metadata?.name ?? undefined,
     avatarUrl: sessionUser.user_metadata?.avatar_url ?? undefined,
     role: profile?.role ?? undefined,
     subscription: profile?.subscription ?? undefined,
@@ -45,39 +47,51 @@ function mergeUser(sessionUser: any, profile: any): AuthUser {
 }
 
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Initial session hydrate
+  // 1) Init from existing session (works in any tab)
   useEffect(() => {
     let isMounted = true;
     (async () => {
       const { data } = await supabase.auth.getSession();
-      const sessionUser = data.session?.user ?? null;
-      if (sessionUser) {
-        const profile = await fetchProfile(sessionUser.id);
-        if (!isMounted) return;
-        setUser(mergeUser(sessionUser, profile));
-      } else {
-        setUser(null);
-      }
+      if (!isMounted) return;
+      setSession(data.session ?? null);
+      setUser(data.session?.user ? mergeUser(data.session.user, null) : null);
       setLoading(false);
     })();
 
-    // Listen for auth changes
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const sessionUser = session?.user ?? null;
-      if (sessionUser) {
-        const profile = await fetchProfile(sessionUser.id);
-        setUser(mergeUser(sessionUser, profile));
+    // 2) Keep in sync across tabs / refreshes
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
+      setSession(s ?? null);
+      if (s?.user) {
+        // Fetch profile lazily, don't block auth state
+        const profile = await fetchProfile(s.user.id);
+        setUser(mergeUser(s.user, profile));
       } else {
         setUser(null);
       }
     });
 
+    // 3) Refresh session on tab focus for long-lived tabs
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        await supabase.auth.getSession(); // forces a quick state sync
+      }
+    };
+    const handleFocus = async () => {
+      await supabase.auth.getSession(); // forces a quick state sync
+    };
+    
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       isMounted = false;
       sub.subscription.unsubscribe();
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
@@ -100,32 +114,47 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
   };
 
-  const signIn = async (email: string) => {
+  // 3) Use the returned session immediately; don't wait for onAuthStateChange
+  const signInWithPassword = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      const emailStr = (email ?? "").toString().trim();
-      if (!isValidEmail(emailStr)) {
-        return { ok: false, error: "Enter a valid email address." };
-      }
-      // Only sends links to existing + confirmed users (prevents enumeration in the UI)
-      const { error } = await supabase.functions.invoke("send-magic-link", {
-        body: { email: emailStr },
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      if (data.session) {
+        setSession(data.session);
+        setUser(mergeUser(data.session.user, null));
+      }
+    } catch (e: any) {
+      console.error("[Auth] signInWithPassword error:", e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      await signInWithPassword(email, password);
       return { ok: true };
     } catch (e: any) {
-      console.error("[Auth] signIn error:", e);
       return { ok: false, error: e?.message ?? "Sign-in failed." };
     }
   };
 
   const signOut = async () => {
+    setLoading(true);
+    try {
     await supabase.auth.signOut();
-    setUser(null);
+      setSession(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = useMemo(
-    () => ({ user, loading, setUser, signIn, signOut, signUp }),
-    [user, loading]
+    () => ({ session, user, loading, setUser, signIn, signOut, signUp, signInWithPassword }),
+    [session, user, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

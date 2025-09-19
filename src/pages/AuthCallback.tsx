@@ -10,10 +10,10 @@ export default function AuthCallback() {
       try {
         const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
         if (error) throw error;
-        nav("/dashboard", { replace: true });
+        nav("/dashboard");
       } catch (e) {
         console.error("[auth-callback] exchange error:", e);
-        nav("/signin?error=callback", { replace: true });
+        nav("/signin?error=callback");
       }
     })();
   }, [nav]);

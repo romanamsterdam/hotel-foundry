@@ -55,8 +55,8 @@ export const supabaseDs: DataSource = {
   async listProjects(): Promise<Project[]> {
     const { data, error } = await supabase
       .from("projects")
-      .select("id,name,owner_id:owner_id,created_at,updated_at,last_edited_by")
-      .order("created_at", { ascending: false });
+      .select("*")
+      .order("updated_at", { ascending: false });
     if (error) throw error;
     return data as Project[];
   },
