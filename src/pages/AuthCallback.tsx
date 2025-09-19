@@ -1,47 +1,54 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../lib/supabase/client";
 
 export default function AuthCallback() {
   const supabase = getSupabase();
   const nav = useNavigate();
-  const url = useMemo(() => new URL(window.location.href), []);
-  const hasCode = !!(url.searchParams.get("code") || url.searchParams.get("token_hash"));
-
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  if (!hasCode) {
-    // User opened /auth/callback directly (or wrong link) — send to sign-in
-    nav("/signin", { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    const finishSignIn = async () => {
+      // This Supabase function reliably handles the session from the URL fragment
+      // without depending on third-party cookies.
+      const { data, error } = await supabase.auth.getSessionFromUrl(window.location.href);
 
-  const onContinue = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-      if (error) throw error;
-      nav("/dashboard", { replace: true });
-    } catch (e: any) {
-      setErr("This link is invalid/expired or was pre-opened by a mail scanner. Request a new link or use the 6-digit code.");
-    } finally {
-      setBusy(false);
-    }
-  };
+      if (error) {
+        setErr(error.message);
+        console.error("Error getting session from URL:", error);
+        // On error, send the user back to the sign-in page to try again.
+        setTimeout(() => nav("/signin", { replace: true }), 3000);
+        return;
+      }
+      
+      if (data.session) {
+        const { session } = data;
+        
+        // This logic checks if the user is in a password recovery flow.
+        const isRecovery = session.user.aud === 'authenticated' && session.user.recovery;
+
+        if (isRecovery) {
+          // If it's a password reset, send them to the correct page.
+          nav("/auth/reset", { replace: true });
+        } else {
+          // Otherwise, it's a successful sign-up or login, send to dashboard.
+          nav("/dashboard", { replace: true });
+        }
+      } else {
+         // Fallback in the rare case no session is found in the URL.
+         setErr("Could not establish a session. Please try signing in again.");
+         setTimeout(() => nav("/signin", { replace: true }), 3000);
+      }
+    };
+
+    finishSignIn();
+  }, [supabase, nav]);
 
   return (
-    <div className="mx-auto max-w-md py-10 space-y-4">
-      <h1 className="text-xl font-semibold">Finish sign in</h1>
-      <button
-        onClick={onContinue}
-        disabled={busy}
-        className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-60"
-      >
-        {busy ? "Continuing…" : "Continue"}
-      </button>
+    <div className="mx-auto max-w-md py-12 space-y-4 text-center">
+      <h1 className="text-xl font-semibold">Finalizing sign-in, please wait…</h1>
       {err && <p className="text-sm text-red-600">{err}</p>}
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
     </div>
   );
 }

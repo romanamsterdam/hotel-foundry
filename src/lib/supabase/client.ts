@@ -1,20 +1,26 @@
 import { createClient } from "@supabase/supabase-js";
+// 👇 CORRECTED: Import the actual exported variables from your env file.
+import { env } from "../../config/env";
 
-let _client: SupabaseClient | null = null;
+let supabase: ReturnType<typeof createClient>;
 
 export function getSupabase() {
-  if (_client) return _client;
-  _client = createClient(import.meta.env.VITE_SUPABASE_URL!, import.meta.env.VITE_SUPABASE_ANON_KEY!, {
+  if (supabase) return supabase;
+
+  // 👇 And use the correctly named variables here.
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    throw new Error("SUPABASE_MISSING_CONFIG");
+  }
+
+  supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,  // <- prevents scanners from auto-consuming tokens
+      // This setting is crucial for our new callback page to work correctly.
+      detectSessionInUrl: false, 
       flowType: "pkce",
-      multiTab: true,             // <- sync sessions across tabs
-      storageKey: "hf-auth-v1",   // <- stable key
     },
   });
-  return _client;
-}
 
-export const supabase = getSupabase();
+  return supabase;
+}
