@@ -4,7 +4,7 @@ import { Building2, ArrowLeft, Headset } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { useAuth } from "../../auth/AuthProvider";
-import AccountMenu from "./AccountMenu";
+import UserMenu from "./UserMenu";
 
 type AppHeaderProps = {
   /** Page title, e.g., "Underwriting" | "Hotel Consulting" | "Development Roadmap" */
@@ -66,7 +66,7 @@ export default function AppHeader({
           {rightNode ? (
             rightNode
           ) : user ? (
-            <AccountMenu />
+            <UserMenu />
           ) : (
             <div className="flex items-center gap-2">
               <Link to="/signin">
