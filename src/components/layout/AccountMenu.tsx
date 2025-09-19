@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
+import AccountSettingsDialog from "@/components/account/AccountSettingsDialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -9,7 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-
 function initialsFrom(email?: string|null) {
   if (!email) return "??";
   const name = email.split("@")[0];
@@ -22,6 +22,7 @@ function initialsFrom(email?: string|null) {
 export function AccountMenu() {
   const nav = useNavigate();
   const auth: any = useAuth(); // { user, status, signOut? }
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const user = auth?.user ?? null;
   const status = auth?.status ?? "loading";
 
@@ -39,9 +40,16 @@ export function AccountMenu() {
 
   const email: string = user.email ?? "user";
   const role = user?.user_metadata?.role || user?.role || "";
-  const initials = useMemo(() => initialsFrom(email), [email]);
+  const initials = useMemo(() => {
+    const name = email.split("@")[0];
+    const parts = name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(" ");
+    const a = (parts[0] || "?")[0]?.toUpperCase() ?? "?";
+    const b = (parts[1] || "")[0]?.toUpperCase() ?? "";
+    return (a + b) || "U";
+  }, [email]);
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -57,17 +65,9 @@ export function AccountMenu() {
           {role && <div className="text-xs text-slate-500">{role}</div>}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => nav("/account")}>
+        <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
           Account / Settings
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => nav("/membership")}>
-          Membership
-        </DropdownMenuItem>
-        {role === "admin" && (
-          <DropdownMenuItem onClick={() => nav("/admin")}>
-            Admin Console
-          </DropdownMenuItem>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-red-600"
@@ -80,6 +80,12 @@ export function AccountMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    
+      <AccountSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
+    </>
   );
 }
 
