@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
-import { toast } from "sonner";
+import { supabase } from "../lib/supabase/client";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -12,47 +11,55 @@ export default function AuthCallback() {
       const href = window.location.href;
       const url = new URL(href);
 
-      // If Supabase sent us explicit errors
-      const err = url.searchParams.get("error") || url.searchParams.get("error_code");
-      const errDesc = url.searchParams.get("error_description") || url.searchParams.get("message");
-      if (err || errDesc) {
-        const msg = errDesc || err || "Authentication error";
-        setErrorMsg(msg);
-        toast.error(msg);
+      // Supabase sends these when something failed
+      const error = url.searchParams.get("error") || url.searchParams.get("error_code");
+      const error_description =
+        url.searchParams.get("error_description") || url.searchParams.get("message");
+
+      if (error || error_description) {
+        setErrorMsg(error_description || error || "Authentication error");
+        // Strip sensitive params from the URL bar
         window.history.replaceState({}, document.title, url.origin + url.pathname);
+        // Give the user a moment, then go to sign-in
         setTimeout(() => navigate("/signin", { replace: true }), 1200);
         return;
       }
 
-      const qsCode = url.searchParams.get("code"); // new style
-      const next = url.searchParams.get("next");   // e.g. "/auth/reset"
-      const type = url.searchParams.get("type");   // "recovery" for reset links
+      // Password reset flow
+      const type = url.searchParams.get("type"); // "recovery" for reset links
+      const next = url.searchParams.get("next"); // e.g. "/auth/reset"
+
+      // New v2 flow: exchange the code for a session (PKCE-safe)
+      const qsCode = url.searchParams.get("code");
 
       try {
         const anyAuth = supabase.auth as any;
-        const input = qsCode ? qsCode : href; // v2 accepts code OR full href
+
         if (typeof anyAuth.exchangeCodeForSession === "function") {
-          const { error } = await anyAuth.exchangeCodeForSession(input);
+          // v2 API: accepts either the code or the full href
+          const input = qsCode ? qsCode : href;
+          const { data, error } = await anyAuth.exchangeCodeForSession(input);
           if (error) throw error;
         } else if (typeof anyAuth.getSessionFromUrl === "function") {
-          const { error } = await anyAuth.getSessionFromUrl({ storeSession: true });
+          // Fallback for old clients (shouldn't happen in v2)
+          const { data, error } = await anyAuth.getSessionFromUrl({ storeSession: true });
           if (error) throw error;
         } else {
           throw new Error("No supported auth callback method found");
         }
 
-        // Clean the URL after exchanging
+        // Clean the URL (remove code, tokens)
         window.history.replaceState({}, document.title, url.origin + url.pathname);
 
+        // Route based on flow
         if (type === "recovery" || next === "/auth/reset") {
           navigate("/auth/reset", { replace: true });
         } else {
           navigate("/dashboard", { replace: true });
         }
-      } catch (e: any) {
-        const msg = e?.message || "Could not finalize sign-in";
-        setErrorMsg(msg);
-        toast.error(msg);
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Could not finalize sign-in");
+        // Clean the URL bar anyway
         window.history.replaceState({}, document.title, url.origin + url.pathname);
         setTimeout(() => navigate("/signin", { replace: true }), 1500);
       }
