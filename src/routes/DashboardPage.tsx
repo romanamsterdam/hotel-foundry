@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { useDisplayName } from "../hooks/useDisplayName";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -83,6 +84,7 @@ function ActionCard({
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const name = useDisplayName();
   const isAdmin = !!user && user.role === "admin";
   const navigate = useNavigate();
 
@@ -92,6 +94,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {`Welcome back${name ? `, ${name}` : ""}.`}
+          </h1>
+          <p className="mt-2 text-lg text-slate-600">
+            Ready to move your hotel idea forward?
+          </p>
+        </div>
+      </div>
+
       {/* Admin Console Link (kept from new version) */}
       {FEATURE_ADMIN && isAdmin && (
         <Card className="border-amber-200 bg-amber-50">
