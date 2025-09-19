@@ -70,7 +70,7 @@ export const supabaseDs: DataSource = {
       .from("projects")
       .select("*")
       .order("updated_at", { ascending: false });
-    return { data: data ?? [], error: error ? mapPgError(error) : null };
+    return { data: data ?? [], error: error ? (error.message ?? "Unknown error") : null };
   },
 
   async getProject(id: string) {

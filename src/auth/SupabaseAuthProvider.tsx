@@ -1,52 +1,58 @@
-import { useEffect, useState } from "react";
-// 👇 CORRECTED: Change the import here.
-import { getSupabase } from "../lib/supabase/client";
-import { AuthContext, AuthSession } from "./AuthContext";
-import { User } from "@supabase/supabase-js";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { User as SupaUser } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabaseClient";
 
-export default function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
-  // 👇 And call the getSupabase() function here to get the client.
-  const supabase = getSupabase();
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<AuthSession | null>(null);
-  const [loading, setLoading] = useState(true);
+type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+type Ctx = { user: SupaUser | null; status: AuthStatus; signOut: () => Promise<void> };
+
+const SupaAuthContext = createContext<Ctx>({
+  user: null,
+  status: "loading",
+  signOut: async () => {},
+});
+
+export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<SupaUser | null>(null);
+  const [status, setStatus] = useState<AuthStatus>("loading");
 
   useEffect(() => {
-    async function getInitialSession() {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
-      } catch (e) {
-        console.warn("[Auth] Error getting initial session:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
+    let mounted = true;
 
-    getInitialSession();
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      const u = data.session?.user ?? null;
+      setUser(u);
+      setStatus(u ? "authenticated" : "unauthenticated");
+    });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      setStatus(u ? "authenticated" : "unauthenticated");
+    });
 
     return () => {
-      authListener.subscription.unsubscribe();
+      mounted = false;
+      subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
-  const value = {
-    session,
-    user,
-    loading,
-    signOut: () => supabase.auth.signOut(),
-  };
+  const value = useMemo<Ctx>(
+    () => ({
+      user,
+      status,
+      async signOut() {
+        await supabase.auth.signOut();
+      },
+    }),
+    [user, status]
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <SupaAuthContext.Provider value={value}>{children}</SupaAuthContext.Provider>;
 }
+
+export function useSupabaseAuth() {
+  return useContext(SupaAuthContext);
+}
+
+export default SupabaseAuthProvider; // optional default

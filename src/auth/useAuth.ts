@@ -1,5 +1,23 @@
-import { useContext } from "react";
-import { AuthContext, type AuthContextType } from "./AuthContext";
+import { useContext, createContext } from "react";
+import type { User as SupaUser } from "@supabase/supabase-js";
+import type { AuthUser } from "../types/auth";
+
+type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+interface AuthContextType {
+  user: AuthUser | null;
+  status: AuthStatus;
+  loading: boolean;
+  signOut: () => Promise<void>;
+}
+
+// Create context here to avoid circular imports
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  status: "loading",
+  loading: true,
+  signOut: async () => {},
+});
 
 // Canonical hook used across the app.
 export function useAuth(): AuthContextType {

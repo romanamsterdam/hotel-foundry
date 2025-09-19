@@ -1,5 +1,19 @@
-// Single source of truth for consumers:
-// import { AuthProvider, useAuth } from "@/auth/AuthProvider";
+import React from "react";
+import { env } from "../lib/env";
+import { SupabaseAuthProvider, useSupabaseAuth } from "./SupabaseAuthProvider";
+import { MockAuthProvider, useMockAuth } from "./MockAuthProvider";
 
-export { default as AuthProvider } from "./SupabaseAuthProvider";
-export { useAuth } from "./useAuth";
+/** Named export expected across the app */
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  if (env.AUTH_PROVIDER === "supabase") {
+    return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
+  }
+  return <MockAuthProvider>{children}</MockAuthProvider>;
+}
+
+/** Single hook surface expected across the app */
+export function useAuth() {
+  return env.AUTH_PROVIDER === "supabase"
+    ? useSupabaseAuth()
+    : useMockAuth();
+}
