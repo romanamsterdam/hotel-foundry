@@ -1,54 +1,77 @@
-import { useEffect, useState } from "react";
+import * as React from "react";
 import { useNavigate } from "react-router-dom";
-import { getSupabase } from "../lib/supabase/client";
+import { supabase } from "../lib/supabase/client";
 
 export default function AuthCallback() {
-  const supabase = getSupabase();
-  const nav = useNavigate();
-  const [err, setErr] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-  useEffect(() => {
-    const finishSignIn = async () => {
-      // This Supabase function reliably handles the session from the URL fragment
-      // without depending on third-party cookies.
-      const { data, error } = await supabase.auth.getSessionFromUrl(window.location.href);
+  React.useEffect(() => {
+    (async () => {
+      const href = window.location.href;
+      const url = new URL(href);
 
-      if (error) {
-        setErr(error.message);
-        console.error("Error getting session from URL:", error);
-        // On error, send the user back to the sign-in page to try again.
-        setTimeout(() => nav("/signin", { replace: true }), 3000);
+      // Supabase sends these when something failed
+      const error = url.searchParams.get("error") || url.searchParams.get("error_code");
+      const error_description =
+        url.searchParams.get("error_description") || url.searchParams.get("message");
+
+      if (error || error_description) {
+        setErrorMsg(error_description || error || "Authentication error");
+        // Strip sensitive params from the URL bar
+        window.history.replaceState({}, document.title, url.origin + url.pathname);
+        // Give the user a moment, then go to sign-in
+        setTimeout(() => navigate("/signin", { replace: true }), 1200);
         return;
       }
-      
-      if (data.session) {
-        const { session } = data;
-        
-        // This logic checks if the user is in a password recovery flow.
-        const isRecovery = session.user.aud === 'authenticated' && session.user.recovery;
 
-        if (isRecovery) {
-          // If it's a password reset, send them to the correct page.
-          nav("/auth/reset", { replace: true });
+      // Password reset flow
+      const type = url.searchParams.get("type"); // "recovery" for reset links
+      const next = url.searchParams.get("next"); // e.g. "/auth/reset"
+
+      // New v2 flow: exchange the code for a session (PKCE-safe)
+      const qsCode = url.searchParams.get("code");
+
+      try {
+        const anyAuth = supabase.auth as any;
+
+        if (typeof anyAuth.exchangeCodeForSession === "function") {
+          // v2 API: accepts either the code or the full href
+          const input = qsCode ? qsCode : href;
+          const { data, error } = await anyAuth.exchangeCodeForSession(input);
+          if (error) throw error;
+        } else if (typeof anyAuth.getSessionFromUrl === "function") {
+          // Fallback for old clients (shouldn't happen in v2)
+          const { data, error } = await anyAuth.getSessionFromUrl({ storeSession: true });
+          if (error) throw error;
         } else {
-          // Otherwise, it's a successful sign-up or login, send to dashboard.
-          nav("/dashboard", { replace: true });
+          throw new Error("No supported auth callback method found");
         }
-      } else {
-         // Fallback in the rare case no session is found in the URL.
-         setErr("Could not establish a session. Please try signing in again.");
-         setTimeout(() => nav("/signin", { replace: true }), 3000);
-      }
-    };
 
-    finishSignIn();
-  }, [supabase, nav]);
+        // Clean the URL (remove code, tokens)
+        window.history.replaceState({}, document.title, url.origin + url.pathname);
+
+        // Route based on flow
+        if (type === "recovery" || next === "/auth/reset") {
+          navigate("/auth/reset", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Could not finalize sign-in");
+        // Clean the URL bar anyway
+        window.history.replaceState({}, document.title, url.origin + url.pathname);
+        setTimeout(() => navigate("/signin", { replace: true }), 1500);
+      }
+    })();
+  }, [navigate]);
 
   return (
-    <div className="mx-auto max-w-md py-12 space-y-4 text-center">
-      <h1 className="text-xl font-semibold">Finalizing sign-in, please wait…</h1>
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center space-y-2">
+        <div className="text-xl font-medium">Finalizing sign-in…</div>
+        {errorMsg && <div className="text-sm text-red-600">{errorMsg}</div>}
+      </div>
     </div>
   );
 }

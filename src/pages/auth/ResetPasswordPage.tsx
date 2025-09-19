@@ -22,8 +22,6 @@ export default function ResetPasswordPage() {
 
     setBusy(true);
     try {
-      // The user already has a session from the AuthCallback page,
-      // so we can directly call updateUser.
       const { error } = await supabase.auth.updateUser({ password: pw1 });
       if (error) throw error;
       setMsg("Password updated successfully! Redirecting to sign in...");
