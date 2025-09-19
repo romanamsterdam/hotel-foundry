@@ -1,9 +1,11 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase/client";
+import { useToast } from "../components/ui/toast";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -52,7 +54,7 @@ export default function AuthCallback() {
         window.history.replaceState({}, document.title, url.origin + url.pathname);
 
         // Route based on flow
-        if (type === "recovery" || next === "/auth/reset") {
+        if (type === "recovery" || next?.includes("/auth/reset")) {
           navigate("/auth/reset", { replace: true });
         } else {
           navigate("/dashboard", { replace: true });
@@ -64,7 +66,7 @@ export default function AuthCallback() {
         setTimeout(() => navigate("/signin", { replace: true }), 1500);
       }
     })();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">

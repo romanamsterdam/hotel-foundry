@@ -1,50 +1,53 @@
 import { useState } from "react";
-import { getSupabase } from "../../lib/supabase/client";
+import { supabase } from "../../lib/supabaseClient";
+import { useToast } from "../../components/ui/toast";
 
 export default function ForgotPasswordPage() {
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = async (e: React.FormEvent) => {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null); setMsg(null);
-    if (!/\S+@\S+\.\S+/.test(email)) return setErr("Enter a valid email.");
-
-    setBusy(true);
+    setLoading(true);
+    setError(null);
     try {
-      const supabase = getSupabase();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+        }
+      );
       if (error) throw error;
-      setMsg("If that email exists, we've sent a reset link.");
-    } catch (e:any) {
-      setErr(e?.message ?? "Could not send reset email.");
+      toast.success("Password reset link sent. Check your email.");
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to send reset email");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <div className="mx-auto max-w-md py-10">
-      <h1 className="mb-2 text-2xl font-semibold">Reset password</h1>
-      <p className="text-slate-600">Enter your email to receive a reset link.</p>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+    <div className="max-w-sm mx-auto p-6">
+      <h1 className="text-xl font-semibold mb-4">Forgot your password?</h1>
+      <form onSubmit={onSubmit} className="space-y-3">
         <input
           type="email"
-          className="w-full rounded border px-3 py-2"
-          placeholder="you@domain.com"
+          required
           value={email}
-          onChange={(e)=>setEmail(e.target.value)}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full border rounded px-3 py-2"
         />
-        <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white" disabled={busy}>
-          {busy ? "Sending…" : "Send reset link"}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 rounded bg-emerald-600 text-white disabled:opacity-50"
+        >
+          {loading ? "Sending…" : "Send reset link"}
         </button>
-        {msg && <p className="text-sm text-emerald-700">{msg}</p>}
-        {err && <p className="text-sm text-red-600">{err}</p>}
       </form>
     </div>
   );

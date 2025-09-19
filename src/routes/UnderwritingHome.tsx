@@ -13,19 +13,41 @@ import { eur0, dateShort } from '../lib/format';
 import { formatDate, formatRelativeTime } from '../lib/utils';
 import SafeImage from '../components/SafeImage';
 import { lastSavedLabel } from '../lib/utils';
+import { seedSampleDeals } from '../lib/datasource';
+import { useToast } from '../components/ui/toast';
 
 export default function UnderwritingHome() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [loadingSamples, setLoadingSamples] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     setDeals(listDeals());
   }, []);
 
-  const handleLoadSamples = () => {
-    saveDeals(sampleDeals);
-    setDeals(listDeals());
+  const handleLoadSamples = async () => {
+    setLoadingSamples(true);
+    try {
+      const result = await seedSampleDeals();
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        // Also add to local storage for immediate UI update
+        saveDeals([...listDeals(), ...sampleDeals]);
+        setDeals(listDeals());
+        toast.success(`${result.count} sample deals added to your account`);
+      }
+    } catch (error: any) {
+      console.error('Failed to seed sample deals:', error);
+      // Fallback to local storage only
+      saveDeals(sampleDeals);
+      setDeals(listDeals());
+      toast.success('Sample deals loaded locally');
+    } finally {
+      setLoadingSamples(false);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -65,7 +87,14 @@ export default function UnderwritingHome() {
                 </Button>
               </Link>
               <Button variant="outline" onClick={handleLoadSamples}>
-                Load Sample Deals
+                {loadingSamples ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600 mr-2"></div>
+                    Loading Samples...
+                  </>
+                ) : (
+                  'Load Sample Deals'
+                )}
               </Button>
             </div>
           </CardContent>
