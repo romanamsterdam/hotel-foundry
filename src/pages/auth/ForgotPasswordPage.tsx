@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
@@ -14,9 +14,11 @@ export default function ForgotPasswordPage() {
     const emailTrimmed = email.trim();
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed);
+      const { error } = await supabase.auth.resetPasswordForEmail(emailTrimmed, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+      });
       if (error) throw error;
-      toast.success("Password reset link sent. Check your email.");
+      toast.success("Password reset link sent.");
     } catch (err: any) {
       const msg = err?.message ?? "Could not send reset email";
       setError(msg);

@@ -88,42 +88,13 @@ export default function SignUpModal({
         email: cleanEmail,
         password: pw1,
         options: {
-          data: {
-            full_name: fullName.trim(),
-            client_type: clientType,
-            plan_id: planId || "beta",
-          },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) throw error;
-
-      const userId = data.user?.id;
-      if (userId) {
-        const { error: upErr } = await supabase
-          .from("profiles")
-          .update({
-            full_name: fullName.trim(),
-            client_type: clientType,
-            plan_id: planId || "beta",
-            accepted_terms_at: new Date().toISOString(),
-            risk_acknowledged: true,
-          })
-          .eq("id", userId);
-        if (upErr) console.warn("[signup] profile update warning:", upErr);
-      }
-
-      if (data.user && !data.session) {
-        setMsg("Account created! Please check your inbox to confirm your email address.");
-      } else {
-        setMsg("Account created successfully! Redirecting to dashboard…");
-        setTimeout(() => {
-          onClose();
-          nav("/dashboard");
-        }, 1200);
-      }
+      toast.success("Check your email to confirm your account.");
     } catch (e: any) {
-      setErr(e?.message ?? "Could not create the account.");
+      toast.error(e?.message ?? "Could not sign up");
     } finally {
       setBusy(false);
     }
