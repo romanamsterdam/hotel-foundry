@@ -1,220 +1,188 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../../lib/supabase/client";
 
+/**
+ * Robust reset-password page that:
+ * 1) Exchanges the URL code for a session (since detectSessionInUrl=false).
+ * 2) Shows a "Set new password" form whenever a session exists (no reliance on PASSWORD_RECOVERY event).
+ * 3) Calls supabase.auth.updateUser({ password }) and redirects.
+ */
 export default function ResetPasswordPage() {
-  const nav = useNavigate();
   const supabase = getSupabase();
+  const navigate = useNavigate();
 
-  const url = useMemo(() => new URL(window.location.href), []);
-  const hasQueryCode = !!(url.searchParams.get("code") || url.searchParams.get("token_hash"));
-  const hasHashToken =
-    typeof window !== "undefined" && window.location.hash.includes("access_token=");
-  const hasLinkToken = hasQueryCode || hasHashToken;
+  type Stage = "checking" | "form" | "saving" | "done" | "error";
+  const [stage, setStage] = useState<Stage>("checking");
+  const [error, setError] = useState<string | null>(null);
+  const [pwd, setPwd] = useState("");
+  const [pwd2, setPwd2] = useState("");
 
-  const [err, setErr] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [exchanging, setExchanging] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const [email, setEmail] = useState("");
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [resending, setResending] = useState(false);
+  const url = useMemo(() => window.location.href, []);
+  const query = useMemo(() => new URLSearchParams(window.location.search), []);
+  const hasCodeParam = !!query.get("code");
 
-  const onContinue = async () => {
-    setErr(null);
-    setInfo(null);
-    setExchanging(true);
-    try {
-      const urlNow = new URL(window.location.href);
-      const hasCodeNow =
-        !!urlNow.searchParams.get("code") || !!urlNow.searchParams.get("token_hash");
-      const hasHashTokenNow = window.location.hash.includes("access_token=");
+  useEffect(() => {
+    let cancelled = false;
 
-      if (hasHashTokenNow) {
-        // Try helper first
-        const tryGetFromUrl = async () => {
-          // If your SDK exposes getSessionFromUrl, this will succeed; otherwise throw and we fallback
-          // @ts-ignore - some builds may not expose getSessionFromUrl
-          const fn = (supabase.auth as any).getSessionFromUrl;
-          if (typeof fn === "function") {
-            const { error } = await fn.call(supabase.auth, { storeSession: true });
-            if (error) throw error;
-          } else {
-            throw new Error("getSessionFromUrl not available");
+    (async () => {
+      setStage("checking");
+      setError(null);
+
+      try {
+        // 1) If the URL contains a code (or hash tokens), try to exchange it for a session.
+        //    This is required because detectSessionInUrl=false in our client options.
+        //    exchangeCodeForSession is safe to call even if already exchanged; it will no-op.
+        if (hasCodeParam || window.location.hash.includes("access_token")) {
+          try {
+            console.log("[/auth/reset] Attempting exchangeCodeForSession()");
+            const { data, error } = await supabase.auth.exchangeCodeForSession(url);
+            if (error) {
+              console.warn("[/auth/reset] exchangeCodeForSession error:", error);
+              // Don't hard fail here—some links may already have created a session.
+            } else {
+              console.log("[/auth/reset] exchange success:", {
+                hasSession: !!data.session,
+                userId: data.session?.user?.id,
+              });
+            }
+          } catch (e) {
+            console.warn("[/auth/reset] exchange threw:", e);
           }
-          history.replaceState(null, "", window.location.pathname + window.location.search);
-        };
-
-        try {
-          await tryGetFromUrl();
-        } catch {
-          // Manual fallback: parse hash and set session
-          const hash = window.location.hash.startsWith("#")
-            ? window.location.hash.slice(1)
-            : window.location.hash;
-          const params = new URLSearchParams(hash);
-          const access_token = params.get("access_token") ?? "";
-          const refresh_token = params.get("refresh_token") ?? "";
-          if (!access_token || !refresh_token) throw new Error("Missing token(s) in hash.");
-          const { error: setErr2 } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (setErr2) throw setErr2;
-          history.replaceState(null, "", window.location.pathname + window.location.search);
         }
-      } else if (hasCodeNow) {
-        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (error) throw error;
-      } else {
-        throw new Error("Missing token in URL.");
+
+        // 2) Check for session. If present, show form; otherwise show error.
+        const { data } = await supabase.auth.getSession();
+        const hasSession = !!data.session?.user;
+        console.log("[/auth/reset] session check:", { hasSession, userId: data.session?.user?.id });
+
+        if (cancelled) return;
+
+        if (hasSession) {
+          setStage("form");
+        } else {
+          setStage("error");
+          setError(
+            "Reset link is invalid or expired. Request a new link from the Sign In page."
+          );
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        console.error("[/auth/reset] unexpected error:", e);
+        setStage("error");
+        setError(e?.message ?? "Unexpected error while preparing password reset.");
       }
+    })();
 
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        setErr("Could not establish a session. Please request a new reset link.");
-        setAuthed(false);
-        return;
-      }
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, url, hasCodeParam]);
 
-      setAuthed(true);
-      setInfo(null);
-      document.getElementById("pw-form")?.scrollIntoView({ behavior: "smooth" });
-    } catch (e: any) {
-      setAuthed(false);
-      setErr("This reset link is invalid or has expired. Request a fresh reset link below.");
-    } finally {
-      setExchanging(false);
-    }
-  };
-
-  const onResend = async (e: React.FormEvent) => {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    setInfo(null);
+    setError(null);
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
-      setErr("Enter a valid email.");
-      return;
+    if (!pwd || pwd.length < 8) {
+      return setError("Password must be at least 8 characters.");
+    }
+    if (pwd !== pwd2) {
+      return setError("Passwords do not match.");
     }
 
-    setResending(true);
+    setStage("saving");
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: `${window.location.origin}/auth/reset`,
-      });
+      const { error } = await supabase.auth.updateUser({ password: pwd });
       if (error) throw error;
-      setInfo("If that email exists, we've sent a new reset link. Please open it in this browser.");
+
+      setStage("done");
+      // Small pause so the user sees success, then go to dashboard
+      setTimeout(() => {
+        navigate("/dashboard", { replace: true });
+      }, 800);
     } catch (e: any) {
-      setErr(e?.message ?? "Could not send reset email.");
-    } finally {
-      setResending(false);
+      console.error("[/auth/reset] updateUser error:", e);
+      setStage("form");
+      setError(e?.message ?? "Could not set the new password. Try again.");
     }
-  };
+  }
 
-  const onSetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    setInfo(null);
-
-    if (!authed) {
-      setErr("Auth session missing. Request a new reset link and try again.");
-      return;
-    }
-    if (pw1.length < 8) return setErr("Password must be at least 8 characters.");
-    if (pw1 !== pw2) return setErr("Passwords do not match.");
-
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: pw1 });
-      if (error) throw error;
-      setPw1("");
-      setPw2("");
-      setInfo("Password updated. Redirecting to sign in…");
-      setTimeout(() => nav("/signin", { replace: true }), 800);
-    } catch (e: any) {
-      setErr(e?.message ?? "Could not set the new password.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="mx-auto max-w-md py-10 space-y-6">
-      <h1 className="text-2xl font-semibold">Reset password</h1>
-
-      {hasLinkToken && !authed && (
-        <div className="rounded border p-4">
-          <p className="text-sm text-slate-700 mb-3">
-            Click to continue with the reset link from your email.
-          </p>
-          <button
-            onClick={onContinue}
-            className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-            disabled={exchanging}
-          >
-            {exchanging ? "Continuing…" : "Continue"}
-          </button>
-        </div>
-      )}
-
-      {(!hasLinkToken || (!!err && !authed)) && (
-        <div className="rounded border p-4">
-          <p className="text-sm text-slate-700 mb-3">
-            If your link was pre-opened by your mail provider or expired, request a fresh one:
-          </p>
-          <form onSubmit={onResend} className="space-y-3">
-            <input
-              type="email"
-              className="w-full rounded border px-3 py-2"
-              placeholder="you@domain.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="w-full rounded bg-black px-3 py-2 text-white"
-              disabled={resending}
-            >
-              {resending ? "Sending…" : "Send new reset link"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      <div id="pw-form" className="rounded border p-4">
-        <form onSubmit={onSetPassword} className="space-y-3">
-          <input
-            type="password"
-            className="w-full rounded border px-3 py-2"
-            placeholder="New password"
-            value={pw1}
-            onChange={(e) => setPw1(e.target.value)}
-          />
-          <input
-            type="password"
-            className="w-full rounded border px-3 py-2"
-            placeholder="Repeat new password"
-            value={pw2}
-            onChange={(e) => setPw2(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-            disabled={busy || !authed}
-          >
-            {busy ? "Setting password…" : "Set new password"}
-          </button>
-          {!authed && (
-            <p className="mt-2 text-xs text-slate-500">
-              Open your latest reset link first to enable password change.
-            </p>
-          )}
-        </form>
+  if (stage === "checking") {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-2">Resetting password…</h1>
+        <p className="text-sm text-gray-600">Preparing your reset session.</p>
       </div>
+    );
+  }
 
-      {info && <p className="text-sm text-emerald-700">{info}</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
+  if (stage === "error") {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-2">Password reset error</h1>
+        {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+        <a className="underline" href="/signin">Back to Sign In</a>
+      </div>
+    );
+  }
+
+  if (stage === "done") {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-2">Password updated</h1>
+        <p className="text-sm text-gray-700">Redirecting you to your dashboard…</p>
+      </div>
+    );
+  }
+
+  // stage: "form" | "saving"
+  return (
+    <div className="max-w-md mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-2">Set a new password</h1>
+      <p className="text-sm text-gray-600 mb-4">
+        You’re signed in from a secure reset link. Choose a new password below.
+      </p>
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium">New password</label>
+          <input
+            type="password"
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="••••••••"
+            autoComplete="new-password"
+            minLength={8}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Repeat new password</label>
+          <input
+            type="password"
+            value={pwd2}
+            onChange={(e) => setPwd2(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+            placeholder="••••••••"
+            autoComplete="new-password"
+            minLength={8}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={stage === "saving"}
+          className="w-full rounded bg-black text-white py-2"
+        >
+          {stage === "saving" ? "Saving…" : "Save new password"}
+        </button>
+      </form>
+
+      {error && <p className="mt-3 text-red-600 text-sm">{error}</p>}
+
+      <div className="mt-4 text-sm">
+        <a className="underline" href="/auth/debug">Auth debug</a>
+      </div>
     </div>
   );
 }
