@@ -20,6 +20,8 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// --- helpers -------------------------------------------------
+
 async function fetchProfile(userId: string) {
   const { data, error } = await supabase
     .from("profiles")
@@ -44,6 +46,14 @@ function mergeUser(sessionUser: any, profile: any): AuthUser {
   };
 }
 
+// Promise timeout so we never hang on a slow profile query
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return await Promise.race([
+    p.then((v) => v as T),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
+
 export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,8 +72,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       });
       if (sessionUser) {
         console.log("[SupabaseAuthProvider] Fetching profile for user:", sessionUser.id);
-        const profile = await fetchProfile(sessionUser.id);
-        console.log("[SupabaseAuthProvider] Profile fetched:", profile);
+        const profile = await withTimeout(fetchProfile(sessionUser.id), 2500);
+        console.log("[SupabaseAuthProvider] Profile fetched (or timed-out):", !!profile);
         if (!isMounted) return;
         const mergedUser = mergeUser(sessionUser, profile);
         console.log("[SupabaseAuthProvider] Setting merged user:", mergedUser);
@@ -87,7 +97,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       const sessionUser = session?.user ?? null;
       if (sessionUser) {
         console.log("[SupabaseAuthProvider] Auth change - fetching profile for:", sessionUser.id);
-        const profile = await fetchProfile(sessionUser.id);
+        const profile = await withTimeout(fetchProfile(sessionUser.id), 2500);
         const mergedUser = mergeUser(sessionUser, profile);
         console.log("[SupabaseAuthProvider] Auth change - setting merged user:", mergedUser);
         setUser(mergedUser);
@@ -140,28 +150,30 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         console.log("[SupabaseAuthProvider] Invalid email format:", emailStr);
         return { ok: false, error: "Enter a valid email address." };
       }
-      // Only sends links to existing + confirmed users (prevents enumeration in the UI)
-      console.log("[SupabaseAuthProvider] Calling edge function send-magic-link");
-      const { error } = await supabase.functions.invoke("send-magic-link", {
-        body: { email: emailStr },
+
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email: emailStr,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: redirectTo,
+        },
       });
       if (error) {
-        console.error("[SupabaseAuthProvider] send-magic-link error:", error);
-        throw error;
+        console.error("[SupabaseAuthProvider] signIn (magic) error:", error);
+        return { ok: false, error: error.message ?? "Could not send magic link." };
       }
-      console.log("[SupabaseAuthProvider] Magic link sent successfully");
+      console.log("[SupabaseAuthProvider] Magic link sent");
       return { ok: true };
     } catch (e: any) {
-      console.error("[Auth] signIn error:", e);
-      return { ok: false, error: e?.message ?? "Sign-in failed." };
+      console.error("[SupabaseAuthProvider] signIn (magic) threw:", e);
+      return { ok: false, error: e?.message ?? "Magic sign-in failed." };
     }
   };
 
   const signOut = async () => {
     console.log("[SupabaseAuthProvider] signOut called");
     await supabase.auth.signOut();
-    console.log("[SupabaseAuthProvider] signOut complete, setting user to null");
-    setUser(null);
   };
 
   const value = useMemo(
