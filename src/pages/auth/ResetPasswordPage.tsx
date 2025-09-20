@@ -35,8 +35,34 @@ export default function ResetPasswordPage() {
 
       if (hasHashTokenNow) {
         // Email link with tokens in the hash
-        const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-        if (error) throw error;
+        const tryGetFromUrl = async () => {
+          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+          if (error) throw error;
+          // Optional: clean the hash after success
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        };
+
+        try {
+          await tryGetFromUrl();
+        } catch (e) {
+          // Fallback: parse hash and set session manually (handles "already consumed/cleared" edge)
+          const hash = window.location.hash.startsWith("#")
+            ? window.location.hash.slice(1)
+            : window.location.hash;
+          const params = new URLSearchParams(hash);
+          const access_token = params.get("access_token") ?? "";
+          const refresh_token = params.get("refresh_token") ?? "";
+          if (!access_token || !refresh_token) throw e;
+
+          const { error: setErr2 } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (setErr2) throw setErr2;
+
+          // Clean the hash now that session is established
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
       } else if (hasCodeNow) {
         // PKCE / recovery link that arrives as ?code= or ?token_hash=
         const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
