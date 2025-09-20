@@ -23,11 +23,7 @@ export default function AuthCallback() {
           if (!access_token || !refresh_token) {
             throw new Error("Missing token(s) in hash.");
           }
-
-          const { error: setErr } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
+          const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
           if (setErr) throw setErr;
 
           // Clean the hash so refreshes don't retry

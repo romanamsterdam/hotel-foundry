@@ -48,6 +48,7 @@ import UserRoadmapPageNew from "./pages/roadmap/UserRoadmapPage";
 import ConsultancyRequestPage from "./features/consulting/ConsultancyRequestPage";
 import AdminConsultingPage from "./features/consulting/AdminConsultingPage";
 import DebugEnv from "./pages/DebugEnv";
+import AuthDebug from "./pages/auth/AuthDebug";
 
 // Simple public layout without modal management
 function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -131,6 +132,7 @@ function App() {
                     
                     {/* Debug Route */}
                     <Route path="/debug" element={<DebugEnv />} />
+                    <Route path="/auth/debug" element={<AuthDebug />} />
                     
                     {/* 404 */}
                     <Route path="*" element={<PublicLayout>
