@@ -10,14 +10,30 @@ export default function AuthCallback() {
       try {
         const url = new URL(window.location.href);
         const hasCode = !!url.searchParams.get("code");
-        const hasHashToken = window.location.hash.includes("access_token=");
+        const hasHash = window.location.hash.includes("access_token=");
 
-        if (hasHashToken) {
-          // Email confirmation / magic-link style: tokens in hash
-          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-          if (error) throw error;
+        if (hasHash) {
+          // Manual parse + setSession to avoid relying on getSessionFromUrl
+          const hash = window.location.hash.startsWith("#")
+            ? window.location.hash.slice(1)
+            : window.location.hash;
+          const params = new URLSearchParams(hash);
+          const access_token = params.get("access_token") ?? "";
+          const refresh_token = params.get("refresh_token") ?? "";
+          if (!access_token || !refresh_token) {
+            throw new Error("Missing token(s) in hash.");
+          }
+
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (setErr) throw setErr;
+
+          // Clean the hash so refreshes don't retry
+          history.replaceState(null, "", window.location.pathname + window.location.search);
         } else if (hasCode) {
-          // OAuth / PKCE style: code in query
+          // OAuth/PKCE style: code in query
           const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
           if (error) throw error;
         } else {
