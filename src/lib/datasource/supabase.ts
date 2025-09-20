@@ -2,10 +2,6 @@ import { supabase } from "../../lib/supabaseClient";
 import type { DataSource, Project, ProjectInput, RoadmapTask, ConsultingRequest, UUID } from "./types";
 import type { ConsultingRequestInput, ConsultingRequestResult } from "./types";
 
-function mapPgError(err: any): string {
-  return err?.message ?? "Unknown error";
-}
-
 const isUuid = (v?: string | null) =>
   !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
@@ -59,107 +55,10 @@ export const supabaseDs: DataSource = {
   async listProjects(): Promise<Project[]> {
     const { data, error } = await supabase
       .from("projects")
-      .select("*")
-      .order("updated_at", { ascending: false });
+      .select("id,name,owner_id:owner_id,created_at,updated_at,last_edited_by")
+      .order("created_at", { ascending: false });
     if (error) throw error;
     return data as Project[];
-  },
-
-  async listMyProjects() {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .order("updated_at", { ascending: false });
-    return { data: data ?? [], error: error ? (error.message ?? "Unknown error") : null };
-  },
-
-  async getProject(id: string) {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", id)
-      .single();
-    return { data: data ?? null, error: error ? mapPgError(error) : null };
-  },
-
-  async upsertProject(input: any) {
-    const payload = { ...input };
-    // Let DB trigger set owner_id and updated_at
-    delete (payload as any).owner_id;
-    delete (payload as any).updated_at;
-
-    const { data, error } = await supabase
-      .from("projects")
-      .upsert(payload, { onConflict: "id", ignoreDuplicates: false })
-      .select()
-      .single();
-
-    return { data: data ?? null, error: error ? mapPgError(error) : null };
-  },
-
-  async deleteProject(id: string) {
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    return { error: error ? mapPgError(error) : null };
-  },
-
-  async seedSampleDeals() {
-    // Sample deals for current user
-    const samples = [
-      { 
-        id: crypto.randomUUID(), 
-        name: "Villa Es Vedra Analysis", 
-        stage: "analysis", 
-        currency: "EUR", 
-        kpis: {
-          rooms: 24,
-          location: "Ibiza, Spain",
-          propertyType: "Boutique",
-          starRating: 4,
-          purchasePrice: 8500000,
-          avgADR: 320,
-          avgOccupancy: 75,
-          avgRevPAR: 240
-        }
-      },
-      { 
-        id: crypto.randomUUID(), 
-        name: "Quinta do Mar Analysis", 
-        stage: "analysis", 
-        currency: "EUR", 
-        kpis: {
-          rooms: 28,
-          location: "Lagos, Portugal",
-          propertyType: "Resort",
-          starRating: 4,
-          purchasePrice: 7200000,
-          avgADR: 280,
-          avgOccupancy: 70,
-          avgRevPAR: 196
-        }
-      },
-      { 
-        id: crypto.randomUUID(), 
-        name: "Palazzo Siciliano Analysis", 
-        stage: "analysis", 
-        currency: "EUR", 
-        kpis: {
-          rooms: 22,
-          location: "Taormina, Italy",
-          propertyType: "Boutique",
-          starRating: 5,
-          purchasePrice: 9800000,
-          avgADR: 420,
-          avgOccupancy: 76,
-          avgRevPAR: 319
-        }
-      }
-    ];
-    
-    const { error, count } = await supabase
-      .from("projects")
-      .insert(samples, { count: "exact" });
-
-    return { count: count ?? 0, error: error ? mapPgError(error) : null };
   },
 
   // unified signature: string | ProjectInput

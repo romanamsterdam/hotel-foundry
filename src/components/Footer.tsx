@@ -73,7 +73,6 @@ export default function Footer() {
             <div className="truncate">© {year} Hotel Foundry</div>
 
             <div className="flex items-center gap-2">
-              {import.meta.env.VITE_SHOW_DEBUG_PILL === "true" && <DebugPill />}
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${pillClass(envTone as any)}`}>
                 {VITE_APP_ENV}
               </span>
@@ -88,16 +87,5 @@ export default function Footer() {
         </div>
       </div>
     </footer>
-  );
-}
-
-function DebugPill() {
-  const { user } = useAuth();
-  const { VITE_AUTH_PROVIDER, VITE_DATA_SOURCE } = getEnvConfig();
-  
-  return (
-    <div className="text-xs px-2 py-1 rounded bg-slate-200 font-mono">
-      {VITE_AUTH_PROVIDER}/{VITE_DATA_SOURCE} · {user?.id?.slice(0,8) ?? "anon"}
-    </div>
   );
 }

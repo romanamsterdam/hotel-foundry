@@ -76,12 +76,6 @@ export interface DataSource {
   createProject(input: string | ProjectInput): Promise<Project>;
   // New: single entrypoint used by Underwriting Save.
   saveProject(input: ProjectInput): Promise<Project>;
-  // New unified project operations
-  listMyProjects?(): Promise<{ data: Project[]; error?: string | null }>;
-  getProject?(id: string): Promise<{ data: Project | null; error?: string | null }>;
-  upsertProject?(input: any): Promise<{ data: Project | null; error?: string | null }>;
-  deleteProject?(id: string): Promise<{ error?: string | null }>;
-  seedSampleDeals?(): Promise<{ count: number; error?: string | null }>;
   listTasks(projectId: UUID): Promise<RoadmapTask[]>;
   upsertTask(input: Partial<RoadmapTask> & { id?: UUID; project_id: UUID; title: string }): Promise<RoadmapTask>;
   listConsulting(): Promise<ConsultingRequest[]>;
