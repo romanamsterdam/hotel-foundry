@@ -7,25 +7,42 @@ export default function ResetPasswordPage() {
   const supabase = getSupabase();
 
   const url = useMemo(() => new URL(window.location.href), []);
-  const hasLinkCode = !!(url.searchParams.get("code") || url.searchParams.get("token_hash"));
+  const hasQueryCode = !!(url.searchParams.get("code") || url.searchParams.get("token_hash"));
+  const hasHashToken = typeof window !== "undefined" && window.location.hash.includes("access_token=");
+  const hasLinkToken = hasQueryCode || hasHashToken;
 
   const [err, setErr] = useState<string | null>(null);
   const [exchanging, setExchanging] = useState(false);
   const [useCode, setUseCode] = useState(false); // show OTP form
-  const [authed, setAuthed] = useState(false); // NEW: we only allow password change when true
+  const [authed, setAuthed] = useState(false); // allow password change only when true
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // 1) RUN EXCHANGE ONLY ON USER CLICK (prevents scanners consuming token)
+  // 1) Run exchange only on user click (prevents scanners consuming token)
   const onContinue = async () => {
     setErr(null);
     setExchanging(true);
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-      if (error) throw error;
+      const urlNow = new URL(window.location.href);
+      const hasCodeNow =
+        !!urlNow.searchParams.get("code") || !!urlNow.searchParams.get("token_hash");
+      const hasHashTokenNow = window.location.hash.includes("access_token=");
+
+      if (hasHashTokenNow) {
+        // Email link with tokens in the hash (common for Supabase email flows)
+        const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+        if (error) throw error;
+      } else if (hasCodeNow) {
+        // PKCE / recovery link that arrives as ?code= or ?token_hash=
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) throw error;
+      } else {
+        throw new Error("Missing token in URL.");
+      }
+
       // After successful exchange, check session
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
@@ -37,7 +54,9 @@ export default function ResetPasswordPage() {
       // success: scroll to password form
       document.getElementById("pw-form")?.scrollIntoView({ behavior: "smooth" });
     } catch (e: any) {
-      setErr("This link is invalid/expired or was pre-opened by a mail scanner. You can continue with the 6-digit code from the email.");
+      setErr(
+        "This link is invalid/expired or was pre-opened by a mail scanner. You can continue with the 6-digit code from the email."
+      );
       setUseCode(true);
       setAuthed(false);
     } finally {
@@ -75,7 +94,7 @@ export default function ResetPasswordPage() {
       setAuthed(true);
       // session established → show password form
       document.getElementById("pw-form")?.scrollIntoView({ behavior: "smooth" });
-    } catch (e:any) {
+    } catch (e: any) {
       setAuthed(false);
       setErr(e?.message ?? "Invalid or expired code. Request a new reset email.");
     } finally {
@@ -100,9 +119,10 @@ export default function ResetPasswordPage() {
       const { error } = await supabase.auth.updateUser({ password: pw1 });
       if (error) throw error;
       // optional: clear state
-      setPw1(""); setPw2("");
+      setPw1("");
+      setPw2("");
       setTimeout(() => nav("/signin", { replace: true }), 800);
-    } catch (e:any) {
+    } catch (e: any) {
       setErr(e?.message ?? "Could not set the new password.");
     } finally {
       setBusy(false);
@@ -113,7 +133,7 @@ export default function ResetPasswordPage() {
     <div className="mx-auto max-w-md py-10 space-y-6">
       <h1 className="text-2xl font-semibold">Reset password</h1>
 
-      {hasLinkCode && !useCode && (
+      {hasLinkToken && !useCode && (
         <div className="rounded border p-4">
           <p className="text-sm text-slate-700 mb-3">
             Click to continue with the reset link from your email.
@@ -131,18 +151,34 @@ export default function ResetPasswordPage() {
         </div>
       )}
 
-      {(!hasLinkCode || useCode) && (
+      {(!hasLinkToken || useCode) && (
         <div className="rounded border p-4">
           <p className="text-sm text-slate-700 mb-3">
             Enter the email and 6-digit code shown in the reset email (works in any browser).
           </p>
           <form onSubmit={onVerifyCode} className="space-y-3">
-            <input type="email" className="w-full rounded border px-3 py-2"
-              placeholder="you@domain.com" value={email} onChange={(e)=>setEmail(e.target.value)} />
-            <input type="text" inputMode="numeric" pattern="\d{6}" maxLength={6}
+            <input
+              type="email"
+              className="w-full rounded border px-3 py-2"
+              placeholder="you@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              maxLength={6}
               className="w-full rounded border px-3 py-2 tracking-widest text-center"
-              placeholder="123456" value={code} onChange={(e)=>setCode(e.target.value)} />
-            <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white" disabled={busy}>
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="w-full rounded bg-black px-3 py-2 text-white"
+              disabled={busy}
+            >
               {busy ? "Verifying…" : "Verify code"}
             </button>
           </form>
@@ -151,11 +187,25 @@ export default function ResetPasswordPage() {
 
       <div id="pw-form" className="rounded border p-4">
         <form onSubmit={onSetPassword} className="space-y-3">
-          <input type="password" className="w-full rounded border px-3 py-2"
-            placeholder="New password" value={pw1} onChange={(e)=>setPw1(e.target.value)} />
-          <input type="password" className="w-full rounded border px-3 py-2"
-            placeholder="Repeat new password" value={pw2} onChange={(e)=>setPw2(e.target.value)} />
-          <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-50" disabled={busy || !authed}>
+          <input
+            type="password"
+            className="w-full rounded border px-3 py-2"
+            placeholder="New password"
+            value={pw1}
+            onChange={(e) => setPw1(e.target.value)}
+          />
+          <input
+            type="password"
+            className="w-full rounded border px-3 py-2"
+            placeholder="Repeat new password"
+            value={pw2}
+            onChange={(e) => setPw2(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="w-full rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+            disabled={busy || !authed}
+          >
             {busy ? "Setting password…" : "Set new password"}
           </button>
           {!authed && (

@@ -8,11 +8,27 @@ export default function AuthCallback() {
   useEffect(() => {
     (async () => {
       try {
-        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-        if (error) throw error;
+        const url = new URL(window.location.href);
+        const hasCode = !!url.searchParams.get("code");
+        const hasHashToken = window.location.hash.includes("access_token=");
+
+        if (hasHashToken) {
+          // Email confirmation / magic-link style: tokens in hash
+          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+          if (error) throw error;
+        } else if (hasCode) {
+          // OAuth / PKCE style: code in query
+          const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+          if (error) throw error;
+        } else {
+          // Nothing to exchange – go to signin
+          nav("/signin?error=missing_token", { replace: true });
+          return;
+        }
+
         nav("/dashboard", { replace: true });
       } catch (e) {
-        console.error("[auth-callback] exchange error:", e);
+        console.error("[auth-callback] finalize error:", e);
         nav("/signin?error=callback", { replace: true });
       }
     })();
