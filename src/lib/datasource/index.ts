@@ -6,26 +6,11 @@ export * from "./types";
 // stubs; real impls added next
 let DS: DataSource | null = null;
 
-export function envInfo() {
-  return {
-    APP_ENV: env.APP_ENV,
-    DATA_SOURCE: env.DATA_SOURCE,
-    AUTH_PROVIDER: env.AUTH_PROVIDER,
-  };
-}
-
 export async function initDataSource(): Promise<DataSource> {
   if (DS) return DS;
   
   console.log("[datasource] selecting:", env.DATA_SOURCE);
-  
-  // In production, never allow mock (safety rail)
-  if (env.APP_ENV === "production") {
-    console.warn("[HF] Forcing supabase in production");
-    const { supabaseDs } = await import("./supabase");
-    DS = supabaseDs as DataSource;
-    console.log("[datasource] initialized: supabase (forced in production)");
-  } else if (env.DATA_SOURCE === "supabase") {
+  if (env.DATA_SOURCE === "supabase") {
     // Check if Supabase is properly configured
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY || !supabase) {
       throw new Error("SUPABASE_MISSING_CONFIG");
@@ -95,17 +80,4 @@ export const listMyProjects = async () => {
     return { data: rows, error: null };
   }
   throw new Error("DataSource not initialized");
-};
-
-// New unified project persistence
-export const upsertProject = async (input: any) => {
-  const ds = await getDataSource();
-  if (!ds.upsertProject) throw new Error("upsertProject not available");
-  return ds.upsertProject(input);
-};
-
-export const seedSampleDeals = async () => {
-  const ds = await getDataSource();
-  if (!ds.seedSampleDeals) throw new Error("seedSampleDeals not available");
-  return ds.seedSampleDeals();
 };

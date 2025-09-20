@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../../lib/supabase/client";
-import { toast } from "sonner";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
@@ -85,29 +84,46 @@ export default function SignUpModal({
     setBusy(true);
 
     try {
-      const email = cleanEmail;
-      const pw1 = pw1;
-
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password: pw1,
         options: {
+          data: {
+            full_name: fullName.trim(),
+            client_type: clientType,
+            plan_id: planId || "beta",
+          },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
-      if (error) {
-        console.error("[signup] error", { error, data });
-        toast.error(error.message || "Signup failed");
-        return;
+      if (error) throw error;
+
+      const userId = data.user?.id;
+      if (userId) {
+        const { error: upErr } = await supabase
+          .from("profiles")
+          .update({
+            full_name: fullName.trim(),
+            client_type: clientType,
+            plan_id: planId || "beta",
+            accepted_terms_at: new Date().toISOString(),
+            risk_acknowledged: true,
+          })
+          .eq("id", userId);
+        if (upErr) console.warn("[signup] profile update warning:", upErr);
       }
 
-      console.log("[signup] ok", data);
-      toast.success("Check your email to confirm your account");
-      onClose();
+      if (data.user && !data.session) {
+        setMsg("Account created! Please check your inbox to confirm your email address.");
+      } else {
+        setMsg("Account created successfully! Redirecting to dashboard…");
+        setTimeout(() => {
+          onClose();
+          nav("/dashboard");
+        }, 1200);
+      }
     } catch (e: any) {
-      console.error("[signup] exception", e);
-      toast.error(e?.message ?? "Something went wrong");
+      setErr(e?.message ?? "Could not create the account.");
     } finally {
       setBusy(false);
     }

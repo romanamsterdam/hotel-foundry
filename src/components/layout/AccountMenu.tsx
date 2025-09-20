@@ -1,92 +1,105 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/auth/AuthProvider";
-import AccountSettingsDialog from "@/components/account/AccountSettingsDialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-function initialsFrom(email?: string|null) {
-  if (!email) return "??";
-  const name = email.split("@")[0];
-  const parts = name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(" ");
-  const a = (parts[0] || "?")[0]?.toUpperCase() ?? "?";
-  const b = (parts[1] || "")[0]?.toUpperCase() ?? "";
-  return (a + b) || "U";
+import { LogOut, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Button } from "../ui/button";
+import { useAuth } from "../../auth/useAuth";
+import AccountSheet from "../account/AccountSheet";
+import { Badge } from "../ui/badge";
+
+function initialsFrom(name?: string, email?: string) {
+  const base = (name || email || "").trim();
+  if (!base) return "U";
+  const parts = base.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : (email?.[0] ?? "");
+  return (first + last).toUpperCase();
 }
 
-export function AccountMenu() {
-  const nav = useNavigate();
-  const auth: any = useAuth(); // { user, status, signOut? }
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const user = auth?.user ?? null;
-  const status = auth?.status ?? "loading";
-
-  // Fallback: show Sign in when not authenticated
-  if (status !== "authenticated" || !user) {
-    return (
-      <button
-        onClick={() => nav("/login")}
-        className="px-3 py-1 rounded-md border text-sm hover:bg-slate-50"
-      >
-        Sign in
-      </button>
-    );
+export default function AccountMenu() {
+  const navigate = useNavigate();
+  const { user, signOut, loading } = useAuth();
+  const [openSheet, setOpenSheet] = React.useState(false);
+  const [imgError, setImgError] = React.useState(false);
+  
+  // Guard for logged-out state
+  if (loading || !user) {
+    return null;
   }
 
-  const email: string = user.email ?? "user";
-  const role = user?.user_metadata?.role || user?.role || "";
-  const initials = useMemo(() => {
-    const name = email.split("@")[0];
-    const parts = name.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(" ");
-    const a = (parts[0] || "?")[0]?.toUpperCase() ?? "?";
-    const b = (parts[1] || "")[0]?.toUpperCase() ?? "";
-    return (a + b) || "U";
-  }, [email]);
+  const name = (user as any)?.name || (user as any)?.fullName || "";
+  const email = (user as any)?.email || "";
+  const avatarUrl = (user as any)?.avatarUrl || (user as any)?.user_metadata?.avatar_url || "";
+  const initials = initialsFrom(name, email);
+
+  async function handleSignOut() {
+    try {
+      await signOut?.();
+    } catch (error) {
+      console.error("Sign out error:", error);
+    } finally {
+      navigate("/"); // always return to landing
+    }
+  }
 
   return (
     <>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label="Open account menu"
-          className="w-9 h-9 rounded-full bg-emerald-600 text-white grid place-items-center font-semibold shadow hover:opacity-90"
-        >
-          {initials}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="leading-tight">
-          <div className="font-medium">{email}</div>
-          {role && <div className="text-xs text-slate-500">{role}</div>}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-          Account / Settings
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-red-600"
-          onClick={async () => {
-            try { if (auth?.signOut) await auth.signOut(); }
-            finally { nav("/", { replace: true }); }
-          }}
-        >
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-    
-      <AccountSettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-9 px-2 rounded-full hover:bg-muted cursor-pointer" data-clickable>
+            <span className="sr-only">Open account menu</span>
+            <div className="flex items-center gap-2">
+              <Avatar className="h-7 w-7">
+                {avatarUrl && !imgError ? (
+                  <AvatarImage 
+                    src={avatarUrl} 
+                    alt={name || email || "User"}
+                    onError={() => setImgError(true)}
+                  />
+                ) : (
+                  <AvatarFallback className="text-xs bg-gradient-to-br from-brand-500 to-accent-500 text-white font-semibold">
+                    {initials}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <span className="hidden sm:inline text-sm font-medium max-w-[160px] truncate">
+                {name || email || "Account"}
+              </span>
+            </div>
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>
+            Signed in as
+            <div className="truncate text-xs text-muted-foreground">{name || email || "User"}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="secondary" className="text-xs">
+                {user.role || 'user'}
+              </Badge>
+              {user.subscription && (
+                <Badge variant="outline" className="text-xs">
+                  {user.subscription}
+                </Badge>
+              )}
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setOpenSheet(true)} className="cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            Profile & Settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 cursor-pointer">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      
+      {/* Unified Profile & Settings Modal */}
+      <AccountSheet open={openSheet} onOpenChange={setOpenSheet} />
     </>
   );
 }
-
-export default AccountMenu;

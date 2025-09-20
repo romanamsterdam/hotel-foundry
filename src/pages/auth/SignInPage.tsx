@@ -20,16 +20,6 @@ async function sendMagicLink(email: string) {
   if (error) throw error;
 }
 
-async function signInWithPassword(email: string, password: string) {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.trim().toLowerCase(),
-    password,
-  });
-  if (error) throw error;
-  return data;
-}
-
 type Mode = "password" | "magic";
 
 export default function SignInPage() {
@@ -51,6 +41,10 @@ export default function SignInPage() {
     return /\S+@\S+\.\S+/.test(v);
   }
 
+  function isEmail(v: string) {
+    return /\S+@\S+\.\S+/.test(v);
+  }
+
   async function onPasswordLogin(e: React.FormEvent) {
     e.preventDefault();
     setErr(null); setMsg(null);
@@ -58,9 +52,10 @@ export default function SignInPage() {
     if (!pwd) return setErr("Enter your password.");
     setBusy(true);
     try {
-      await signInWithPassword(email, pwd);
+      const { error } = await getSupabase().auth.signInWithPassword({ email, password: pwd });
+      if (error) throw error;
+      // onAuthStateChange will fire; useEffect above will redirect
       setMsg("Signed in. Redirecting…");
-      navigate("/dashboard");
     } catch (e: any) {
       setErr(e?.message ?? "Sign-in failed.");
     } finally {
@@ -71,6 +66,7 @@ export default function SignInPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
+
     if (!isEmail(email)) {
       setErr("Enter a valid email.");
       return;
@@ -78,15 +74,7 @@ export default function SignInPage() {
 
     setBusy(true);
     try {
-      const supabase = getSupabase();
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { 
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-          shouldCreateUser: true 
-        },
-      });
-      if (error) throw error;
+      await sendMagicLink(email);
       setSent(true);
       setMsg("If your email is registered, you will receive a login link.");
     } catch (err: any) {
@@ -96,6 +84,20 @@ export default function SignInPage() {
       setBusy(false);
     }
   };
+
+  async function onForgotPassword() {
+    setErr(null); setMsg(null);
+    if (!isEmail(email)) return setErr("Enter your email first.");
+    try {
+      const redirectTo = `${window.location.origin}/auth/reset`; // <-- consistent origin fix
+      const { error } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      setMsg("Password reset email sent (if the account exists).");
+    } catch (e: any) {
+      console.error("[sign-in] resetPassword error:", e);
+      setErr(e?.message ?? "Could not send the reset email. Please try again.");
+    }
+  }
 
   return (
     <div className="max-w-md mx-auto p-6">
