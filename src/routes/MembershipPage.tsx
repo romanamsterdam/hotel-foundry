@@ -7,27 +7,27 @@ import { plans } from '../data/plans';
 const faqs = [
   {
     question: 'What is USALI and why is it important for hotel underwriting?',
-    answer: 'USALI (Uniform System of Accounts for the Lodging Industry) is the global standard for hotel financial reporting. Our platform generates USALI-compliant P&L statements with proper departmental (rooms, F&B) and undistributed (marketing, maintenance) cost allocations, plus FF&E reserves. This ensures your analysis meets investor and lender expectations.'
+    answer: 'USALI (Uniform System of Accounts for the Lodging Industry) is the global standard for hotel financial reporting. Our platform uses industry standard reporting, which is recognized by banks, investors and operators. This makes it easier to get financing and ensures your analysis is easily understood.'
   },
   {
-    question: 'How accurate are the benchmark data for European leisure markets?',
-    answer: 'Our benchmarks are sourced from actual hotel performance data across the Balearics and similar markets. We track ADR, occupancy, RevPAR, and operational costs for comparable 15-40 room properties. Data is updated quarterly and includes seasonal variations typical of leisure destinations.'
+    question: 'What if i dont know how to underwrite my hotel deal?',
+    answer: 'Our platform is built by industry experts with 15+ years of experience in hotel investment, sales and operations across Europe and Asia. We are always one request away from helping you review your assumptions, guide you through next steps or brainstorm possible solutions together. We also have a wider pool of industry experts for industry specifics - from IT to real estate development to pre-opening and operations.'
   },
   {
     question: 'Can I export my underwriting models to Excel or PDF?',
-    answer: 'Yes, all plans include export functionality. You can generate board-ready PDF presentations and export underlying Excel models for further customization. The Pro plan includes additional template formats for due diligence and investor presentations.'
+    answer: 'We have base functionality to export PDFs, but are still working on extractable excel files. In case if you need an excel financial model following your underwriting - please reach out to us via support@hotelfoundry.app and we will be able to help. '
   },
   {
-    question: 'What are consultancy credits and how do they work?',
-    answer: 'Consultancy credits give you access to our team of hotel investment specialists for one-on-one guidance. Each credit covers a 30-minute consultation on specific deals, market analysis, or underwriting questions. Pro plan members receive 10 credits monthly.'
+    question: 'Do you offer consultancy and tempaltes for investor or lender presentations?',
+    answer: 'Consultancy is available through the platform - you can fill out your request, select the level of experience you are looking for and we will send you the proposal as well as the consultant profile. We are also working on the database of investor and lender presentations.'
   },
   {
     question: 'Is there a free trial available?',
     answer: 'We offer a limited-time Beta-tester membership at €99 lifetime for early adopters. This gives you full access to test the platform. For ongoing use, we recommend the Starter plan at €99/month.'
   },
   {
-    question: 'What markets will you cover beyond the Balearics?',
-    answer: 'We\'re expanding to cover Portuguese Algarve, Italian coastal markets (Sicily, Puglia), and French Riviera by Q2 2025. Our roadmap includes mainland Spain coastal markets and Greek islands by end of 2025.'
+    question: 'What markets do you have expertise in?',
+    answer: 'Our primary focus and experience is in Europe, but we have also worked across Asia and have a wide network of industry experts across the board. We will do our best to help you deal wherever it is.'
   }
 ];
 
@@ -91,13 +91,13 @@ export default function MembershipPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a 
-              href="mailto:enterprise@hotelfoundry.com"
+              href="mailto:support@hotelfoundry.com"
               className="inline-block bg-white text-slate-900 hover:bg-white/90 px-6 py-3 rounded-md font-medium transition-colors"
             >
               Contact Enterprise Sales
             </a>
             <a 
-              href="mailto:hello@hotelfoundry.com"
+              href="mailto:support@hotelfoundry.com"
               className="inline-block border border-white text-white hover:bg-white hover:text-slate-900 px-6 py-3 rounded-md font-medium transition-colors"
             >
               General Inquiries
