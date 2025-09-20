@@ -34,7 +34,11 @@ export default function SignInPage() {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
+    console.log("[SignInPage] useEffect user changed:", user);
+    if (user) {
+      console.log("[SignInPage] User detected, navigating to dashboard");
+      navigate("/dashboard", { replace: true });
+    }
   }, [user, navigate]);
 
   function isEmail(v: string) {
@@ -47,19 +51,33 @@ export default function SignInPage() {
 
   async function onPasswordLogin(e: React.FormEvent) {
     e.preventDefault();
+    console.log("[SignInPage] onPasswordLogin started", { email, passwordLength: pwd.length });
     setErr(null); setMsg(null);
-    if (!isEmail(email)) return setErr("Enter a valid email.");
-    if (!pwd) return setErr("Enter your password.");
+    if (!isEmail(email)) {
+      console.log("[SignInPage] Invalid email format:", email);
+      return setErr("Enter a valid email.");
+    }
+    if (!pwd) {
+      console.log("[SignInPage] No password provided");
+      return setErr("Enter your password.");
+    }
     setBusy(true);
+    console.log("[SignInPage] Calling signInWithPassword...");
     try {
       const { error } = await getSupabase().auth.signInWithPassword({ email, password: pwd });
-      if (error) throw error;
+      if (error) {
+        console.error("[SignInPage] signInWithPassword error:", error);
+        throw error;
+      }
+      console.log("[SignInPage] signInWithPassword success - waiting for auth state change");
       // onAuthStateChange will fire; useEffect above will redirect
       setMsg("Signed in. Redirecting…");
     } catch (e: any) {
+      console.error("[SignInPage] signInWithPassword catch:", e);
       setErr(e?.message ?? "Sign-in failed.");
     } finally {
       setBusy(false);
+      console.log("[SignInPage] onPasswordLogin finished");
     }
   }
 
@@ -86,12 +104,21 @@ export default function SignInPage() {
   };
 
   async function onForgotPassword() {
+    console.log("[SignInPage] onForgotPassword called for email:", email);
     setErr(null); setMsg(null);
-    if (!isEmail(email)) return setErr("Enter your email first.");
+    if (!isEmail(email)) {
+      console.log("[SignInPage] Invalid email for forgot password:", email);
+      return setErr("Enter your email first.");
+    }
     try {
       const redirectTo = `${window.location.origin}/auth/reset`; // <-- consistent origin fix
+      console.log("[SignInPage] Calling resetPasswordForEmail with redirectTo:", redirectTo);
       const { error } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo });
-      if (error) throw error;
+      if (error) {
+        console.error("[SignInPage] resetPasswordForEmail error:", error);
+        throw error;
+      }
+      console.log("[SignInPage] Reset password email sent successfully");
       setMsg("Password reset email sent (if the account exists).");
     } catch (e: any) {
       console.error("[sign-in] resetPassword error:", e);

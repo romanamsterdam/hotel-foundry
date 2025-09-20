@@ -51,26 +51,48 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   // Initial session hydrate
   useEffect(() => {
     let isMounted = true;
+    console.log("[SupabaseAuthProvider] Initial session hydrate starting");
     (async () => {
       const { data } = await supabase.auth.getSession();
       const sessionUser = data.session?.user ?? null;
+      console.log("[SupabaseAuthProvider] Initial session:", { 
+        hasSession: !!data.session, 
+        userId: sessionUser?.id,
+        email: sessionUser?.email 
+      });
       if (sessionUser) {
+        console.log("[SupabaseAuthProvider] Fetching profile for user:", sessionUser.id);
         const profile = await fetchProfile(sessionUser.id);
+        console.log("[SupabaseAuthProvider] Profile fetched:", profile);
         if (!isMounted) return;
-        setUser(mergeUser(sessionUser, profile));
+        const mergedUser = mergeUser(sessionUser, profile);
+        console.log("[SupabaseAuthProvider] Setting merged user:", mergedUser);
+        setUser(mergedUser);
       } else {
+        console.log("[SupabaseAuthProvider] No session user, setting user to null");
         setUser(null);
       }
       setLoading(false);
+      console.log("[SupabaseAuthProvider] Initial session hydrate complete");
     })();
 
     // Listen for auth changes
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log("[SupabaseAuthProvider] Auth state change:", { 
+        event: _event, 
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email 
+      });
       const sessionUser = session?.user ?? null;
       if (sessionUser) {
+        console.log("[SupabaseAuthProvider] Auth change - fetching profile for:", sessionUser.id);
         const profile = await fetchProfile(sessionUser.id);
-        setUser(mergeUser(sessionUser, profile));
+        const mergedUser = mergeUser(sessionUser, profile);
+        console.log("[SupabaseAuthProvider] Auth change - setting merged user:", mergedUser);
+        setUser(mergedUser);
       } else {
+        console.log("[SupabaseAuthProvider] Auth change - no session user, setting null");
         setUser(null);
       }
     });
@@ -82,16 +104,26 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   }, []);
 
   const signUp = async (email: string, password: string) => {
+    console.log("[SupabaseAuthProvider] signUp called:", { email, passwordLength: password.length });
     if (!isValidEmail(email)) return { ok: false, error: "Enter a valid email address." };
     if (!password || password.length < 8) return { ok: false, error: "Password must be at least 8 characters." };
     try {
       const redirectTo = `${window.location.origin}/auth/callback`;
+      console.log("[SupabaseAuthProvider] Calling supabase.auth.signUp with redirectTo:", redirectTo);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: redirectTo },
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[SupabaseAuthProvider] signUp error:", error);
+        throw error;
+      }
+      console.log("[SupabaseAuthProvider] signUp success:", { 
+        hasSession: !!data.session,
+        userId: data.user?.id,
+        requiresConfirmation: !data.session 
+      });
       // If there's no session yet, user must confirm their email
       return { ok: true, requiresConfirmation: !data.session };
     } catch (e: any) {
@@ -101,16 +133,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   };
 
   const signIn = async (email: string) => {
+    console.log("[SupabaseAuthProvider] signIn (magic link) called:", { email });
     try {
       const emailStr = (email ?? "").toString().trim();
       if (!isValidEmail(emailStr)) {
+        console.log("[SupabaseAuthProvider] Invalid email format:", emailStr);
         return { ok: false, error: "Enter a valid email address." };
       }
       // Only sends links to existing + confirmed users (prevents enumeration in the UI)
+      console.log("[SupabaseAuthProvider] Calling edge function send-magic-link");
       const { error } = await supabase.functions.invoke("send-magic-link", {
         body: { email: emailStr },
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[SupabaseAuthProvider] send-magic-link error:", error);
+        throw error;
+      }
+      console.log("[SupabaseAuthProvider] Magic link sent successfully");
       return { ok: true };
     } catch (e: any) {
       console.error("[Auth] signIn error:", e);
@@ -119,7 +158,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   };
 
   const signOut = async () => {
+    console.log("[SupabaseAuthProvider] signOut called");
     await supabase.auth.signOut();
+    console.log("[SupabaseAuthProvider] signOut complete, setting user to null");
     setUser(null);
   };
 
