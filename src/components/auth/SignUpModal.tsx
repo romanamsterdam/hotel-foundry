@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { getSupabase } from "../../lib/supabase/client";
+import { toast } from "sonner";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
@@ -84,17 +85,29 @@ export default function SignUpModal({
     setBusy(true);
 
     try {
+      const email = cleanEmail;
+      const pw1 = pw1;
+
       const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
+        email,
         password: pw1,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      if (error) throw error;
-      toast.success("Check your email to confirm your account.");
+      
+      if (error) {
+        console.error("[signup] error", { error, data });
+        toast.error(error.message || "Signup failed");
+        return;
+      }
+
+      console.log("[signup] ok", data);
+      toast.success("Check your email to confirm your account");
+      onClose();
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not sign up");
+      console.error("[signup] exception", e);
+      toast.error(e?.message ?? "Something went wrong");
     } finally {
       setBusy(false);
     }
